@@ -1,0 +1,18 @@
+# no tempfiles from editors
+*.sw?
+
+# no Python artifacts
+*.pyc
+__pycache__/
+
+# no build system artifacts
+/build/
+/.cache/
+/.coverage
+/.eggs/
+/htmlcov/
+*.egg-info/
+/docs/api/
+
+# exclude my virtualenv
+/.py3
