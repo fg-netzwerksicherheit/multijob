@@ -182,11 +182,18 @@ class JobBuilder(object):
         if stride <= 0:
             raise ValueError("stride must be positive")
 
-        def _take_while_le(bound, generator):
-            return itertools.takewhile(lambda x: x <= bound, generator)
+        def _values():
+            # pylint: disable=invalid-name
+            n = 0
+            while True:
+                value = start + n * stride
+                if value <= end:
+                    yield value
+                else:
+                    break
+                n += 1
 
-        infinite_generator = (start + n * stride for n in itertools.count(0))
-        values = list(_take_while_le(end, infinite_generator))
+        values = list(_values())
 
         self._add_list(param, values)
         return values
