@@ -1,0 +1,15 @@
+[run]
+branch = True
+concurrency = multiprocessing
+
+omit =
+    # omit tests from coverage calculation
+    */test/*.py
+
+[report]
+exclude_lines =
+    # default exclusion comment
+    pragma: no cover
+
+[html]
+directory = htmlcov
