@@ -13,7 +13,7 @@ Reference
 =========
 
 .. toctree::
-    ./api/multiprocessor.rst
+    ./api/multijob.rst
 
 Indices and tables
 ==================

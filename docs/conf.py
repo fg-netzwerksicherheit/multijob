@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Multiprocessor documentation build configuration file, created by
+Multijob documentation build configuration file, created by
 sphinx-quickstart on Thu Feb  2 15:04:33 2017.
 
 This file is execfile()d with the current directory set to its
@@ -57,7 +57,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Multiprocessor'
+project = 'Multijob'
 copyright = '2017, TODO authors'
 author = 'TODO authors'
 
@@ -161,7 +161,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'multiprocessor', 'Multiprocessor Documentation',
+    (master_doc, 'multijob', 'Multijob Documentation',
      [author], 1)
 ]
 
@@ -172,8 +172,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Multiprocessor', 'Multiprocessor Documentation',
-     author, 'Multiprocessor', 'One line description of project.',
+    (master_doc, 'Multijob', 'Multijob Documentation',
+     author, 'Multijob', 'One line description of project.',
      'Miscellaneous'),
 ]
 

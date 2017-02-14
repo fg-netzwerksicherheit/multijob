@@ -3,7 +3,7 @@
 """Turn job objects into command line arguments and back again.
 """
 
-import multiprocessor.job
+import multijob.job
 
 def _parse_bool(value):
     """Parse a boolean string "True" or "False".
@@ -140,7 +140,7 @@ def _string_from_value(name, value, coercion):
         ...
         >>> _string_from_value('x', EvilValue(), str)
         Traceback (most recent call last):
-        ValueError: Could not coerce 'x'=<multiprocessor.commandline.EvilValue object at 0x...>:
+        ValueError: Could not coerce 'x'=<multijob.commandline.EvilValue object at 0x...>:
         I don't want to go!
 
     """
@@ -220,7 +220,7 @@ def argv_from_job(job, *, typemap=None, default_coercion=None):
     and will have to be provided explicitly when parsing the arguments.
 
     Args:
-        job (multiprocessor.job):
+        job (multijob.job):
             The job to format.
         typemap (Typemap):
             Optional. Controls how individual params are formatted.
@@ -232,7 +232,7 @@ def argv_from_job(job, *, typemap=None, default_coercion=None):
 
     Example: simple usage::
 
-        >>> from multiprocessor.job import Job
+        >>> from multijob.job import Job
         >>> def target(): pass
         >>> job = Job(42, 3, target, dict(a=42, b=True, c='foo'))
         >>> argv_from_job(job)
@@ -240,7 +240,7 @@ def argv_from_job(job, *, typemap=None, default_coercion=None):
 
     Example: storing a list::
 
-        >>> from multiprocessor.job import Job
+        >>> from multijob.job import Job
         >>> import csv
         >>> import io
         >>> def csv_line(items):
@@ -273,14 +273,14 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
             The arguments.
         callback (callable):
             A function to invoke with the params,
-            see :class:`multiprocessor.job.Job` for details.
+            see :class:`multijob.job.Job` for details.
         typemap (Typemap):
             Controls how individual params are parsed.
         default_coercion (Coercion):
             Optional. Controls how params without a typemap entry are formatted.
 
     Returns:
-        multiprocessor.job.Job: a runnable job with the params from this argv.
+        multijob.job.Job: a runnable job with the params from this argv.
 
     Example: simple usage::
 
@@ -296,7 +296,7 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
         >>> result = job.run()
         Args: a=42, b=True, c='foo'
         >>> result
-        <multiprocessor.job.JobResult object at 0x...>
+        <multijob.job.JobResult object at 0x...>
 
     Example: reading a list::
 
@@ -339,4 +339,4 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
                              typemap=typemap,
                              default_coercion=default_coercion)
 
-    return multiprocessor.job.Job(job_id, repetition_id, callback, params)
+    return multijob.job.Job(job_id, repetition_id, callback, params)

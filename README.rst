@@ -1,6 +1,6 @@
-=======================================================================
-Multiprocessor – define job configurations and execute them in parallel
-=======================================================================
+==========================================================================
+Multijob – define multiple job configurations and execute them in parallel
+==========================================================================
 
 When you have a job that you need to run many times in many configurations – this module is the solution.
 

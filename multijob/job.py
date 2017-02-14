@@ -292,7 +292,7 @@ class JobBuilder(object):
             (...)
             >>> jobs = builder.build(target, 2)
             >>> jobs
-            [<multiprocessor.job.Job object at 0x...>, ...]
+            [<multijob.job.Job object at 0x...>, ...]
             >>> for job in jobs:
             ...     print(job)
             0:0: x=2 y=1 z=True

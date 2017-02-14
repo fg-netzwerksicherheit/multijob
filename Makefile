@@ -1,4 +1,4 @@
-NAME = multiprocessor
+NAME = multijob
 SETUPPY := python setup.py
 AUTODOC_DEFAULTS := members,show-inheritance
 OPEN_BROWSER := xdg-open

@@ -7,7 +7,7 @@ which are focussed on normal usage.
 # pylint: disable=missing-docstring,invalid-name,unused-variable
 
 import pytest
-import multiprocessor.commandline as commandline
+import multijob.commandline as commandline
 
 def describe_job_from_argv():
 
