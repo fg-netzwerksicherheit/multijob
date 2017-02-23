@@ -1,4 +1,7 @@
 """Configure, build, and install the module."""
 
 from setuptools import setup
-setup()
+
+setup(
+    name='multijob',
+    packages=['multijob'])
