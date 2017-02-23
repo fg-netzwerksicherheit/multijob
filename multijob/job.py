@@ -90,6 +90,14 @@ class JobResult(object):
         """Whatever the job callback returned."""
         return self._result
 
+def _dict_list_product(dict_of_lists):
+    lists_of_kv_pairs = [
+        [(key, value) for value in dict_of_lists[key]]
+        for key in sorted(dict_of_lists.keys())]
+
+    for kv_pairs in itertools.product(*lists_of_kv_pairs):
+        yield dict(kv_pairs)
+
 class JobBuilder(object):
     """Create a range of jobs to cover the required parameter combinations
 
@@ -160,6 +168,16 @@ class JobBuilder(object):
             >>> builder.add_range('x', 0, 3, 0.5)
             [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 
+        Example::
+
+            >>> def round_all(ndigits, xs):
+            ...     return [round(x, ndigits) for x in xs]
+            >>> builder = JobBuilder()
+            >>> expected = round_all(7, [0/3, 1/3, 2/3, 3/3, 4/3, 5/3, 6/3])
+            >>> actual = round_all(7, builder.add_range('x', 0, 2, 1/3))
+            >>> actual == expected or (actual, expected)
+            True
+
         Example: start must be smaller than end::
 
             >>> builder = JobBuilder()
@@ -220,6 +238,14 @@ class JobBuilder(object):
             >>> builder.add_linspace('x', 0, 3, 7)
             [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 
+        Example::
+
+            >>> builder = JobBuilder()
+            >>> expected = [0.0, 1/3, 2/3, 1.0, 4/3, 5/3, 2.0]
+            >>> actual = builder.add_linspace('x', 0, 2, 7)
+            >>> actual == expected or (actual, expected)
+            True
+
         Example: start must be smaller than stop::
 
             >>> builder = JobBuilder()
@@ -243,8 +269,7 @@ class JobBuilder(object):
             raise ValueError("num must be at least 2 to include the start and stop")
 
         span = stop - start
-        stride = span / (num - 1)
-        values = [start + n * stride for n in range(num)]
+        values = [span * (n / (num - 1)) for n in range(num)]
 
         self._add_list(param, values)
         return values
@@ -338,15 +363,7 @@ class JobBuilder(object):
         if repetitions < 1:
             raise ValueError("at least one repetition required")
 
-        params_as_dict_of_lists = self._param_lists
-        params_as_lists_of_pairs = [
-            [(key, value) for value in params_as_dict_of_lists[key]]
-            for key in sorted(params_as_dict_of_lists.keys())
-        ]
-        params_product = [
-            dict(kv_pairs)
-            for kv_pairs in itertools.product(*params_as_lists_of_pairs)
-        ]
+        params_product = _dict_list_product(self._param_lists)
 
         jobs = []
 
