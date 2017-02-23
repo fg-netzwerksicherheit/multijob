@@ -4,9 +4,11 @@
 # no Python artifacts
 *.pyc
 __pycache__/
+/.coverage.*
 
 # no build system artifacts
 /build/
+/dist/
 /.cache/
 /.coverage
 /.eggs/
