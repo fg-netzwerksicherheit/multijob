@@ -1,6 +1,38 @@
 # coding: utf8
 
 """Turn job objects into command line arguments and back again.
+
+You should use :func:`job_from_argv` and :func:`argv_from_job` to convert
+between :class:`multijob.job.Job` instances and command line parameters.  These
+functions use *typemaps* and *coercions*.
+
+A typemap is a dictionary that maps named params to a specific coercion.
+
+A coercion is a function that turns a string into a Python data type or back
+(see :class:`Coercion`).
+
+If you need to take more control over parsing, you can get convenient
+random-access to the command line parameters via :class:`UnparsedArguments`, or
+can apply a particular coercion to a string value via
+:func:`value_from_string`.
+
+.. class:: Coercion
+
+    Coercion from command line args to Python objects.
+
+    Coercions describe how command line arguments are converted to Python data
+    types. There isn't an actual coercion class, but this concept is used
+    throughout the module documentation.
+
+    Coercions are functions that take a single parameter (the string to be
+    coerced) and return a single Python object.  Coercions may also be *named*.
+    Instead of supplying a callback, the coercion may be one of:
+
+    -   ``'str'``
+    -   ``'int'``
+    -   ``'float'``
+    -   ``'bool'``
+
 """
 
 import multijob.job
@@ -31,14 +63,6 @@ NAMED_COERCIONS = dict(
     float=float,
     bool=_parse_bool,
 )
-"""
-Available named coercions from strings to data types:
-
- -  str
- -  int
- -  float
- -  bool
-"""
 
 def _update_ex_message(ex, new_message, *args, **kwargs):
     """Given an exception, prepend something to its message.
@@ -57,31 +81,39 @@ def _update_ex_message(ex, new_message, *args, **kwargs):
     new_message = new_message.format(*args, **kwargs)
     ex.args = (new_message + "\n" + ex.args[0], *ex.args[1:])
 
-def _value_from_string(name, value, coercion):
+def value_from_string(name, value, coercion):
     """Parse a value from a string with a given coercion.
 
     This function primarily adds error handling,
     and contains support for named coercions.
 
+    Args:
+        name (str): The name of this argument, needed for diagnostics.
+        value (str): The string to coerce.
+        coercion (str|Coercion): a named coercion or a coercion callback.
+
+    Returns:
+        the coerced value.
+
     Example: normal usage::
 
-        >>> _value_from_string('x', '42', int)
+        >>> value_from_string('x', '42', int)
         42
 
     Example: requires a coercion::
 
-        >>> _value_from_string('x', '42', None)
+        >>> value_from_string('x', '42', None)
         Traceback (most recent call last):
         TypeError: no coercion found for 'x'='42'
 
     Example: named coercions::
 
-        >>> _value_from_string('x', 'False', 'bool')
+        >>> value_from_string('x', 'False', 'bool')
         False
 
     Example: coercions must be callable::
 
-        >>> _value_from_string('x', '42', 123)
+        >>> value_from_string('x', '42', 123)
         Traceback (most recent call last):
         TypeError: 'x' coercion must be callable: 123
 
@@ -90,7 +122,7 @@ def _value_from_string(name, value, coercion):
         >>> def bad_coercion(value):
         ...     raise ValueError("nope")
         ...
-        >>> _value_from_string('x', '42', bad_coercion)
+        >>> value_from_string('x', '42', bad_coercion)
         Traceback (most recent call last):
         ValueError: Could not coerce 'x'='42':
         nope
@@ -159,6 +191,69 @@ def _string_from_value(name, value, coercion):
         _update_ex_message(ex, "Could not coerce {!r}={!r}:", name, value)
         raise
 
+def _unparsed_dict_from_argv(argv):
+    """Split command line arguments into a dict, without applying coercions.
+    """
+    arg_dict = dict()
+
+    for arg in argv:
+        name, value = arg.split('=', 1)
+        arg_dict[name] = value
+
+    return arg_dict
+
+class UnparsedArguments(object):
+    """A collection of unnamed arguments.
+
+    This may be useful if you have to do some parsing manually.
+
+    Use :meth:`from_argv` to construct this object from an argv array.
+
+    Args:
+        args (dict): the name-value command line parameters.
+    """
+
+    def __init__(self, args):
+        self._args = dict(args)
+
+    @staticmethod
+    def from_argv(argv):
+        """Create UnparsedArguments from an argv array.
+        """
+
+        return UnparsedArguments(_unparsed_dict_from_argv(argv))
+
+    def read(self, name, coercion):
+        """Consume and coerce a named argument.
+
+        Since the argument is consumed, it cannot be consumed again.
+
+        Args:
+            name (str): The name of the argument to consume.
+            coercion (Coercion): The coercion to apply to this value.
+
+        Returns:
+            the coerced value.
+
+        Raises:
+            KeyError: when no such argument name exists.
+            ValueError: when the value can't be coerced.
+        """
+
+        try:
+            value = self._args.pop(name)
+        except KeyError:
+            raise KeyError("expected {!r} in argv".format(name))
+
+        return value_from_string(name, value, coercion)
+
+    def __bool__(self):
+        return bool(self._args)
+
+    def __iter__(self):
+        return iter(self._args)
+
+
 def _dict_from_argv(argv, *, typemap, default_coercion=None):
     """Parse command line args to a dict.
 
@@ -179,11 +274,11 @@ def _dict_from_argv(argv, *, typemap, default_coercion=None):
 
     arg_dict = dict()
 
-    for arg in argv:
-        name, value = arg.split('=', 1)
+    unparsed = UnparsedArguments.from_argv(argv)
+    for name in list(unparsed):
         coercion = typemap.get(name, default_coercion)
-        coerced_value = _value_from_string(name, value, coercion)
-        arg_dict[name] = coerced_value
+        value = unparsed.read(name, coercion)
+        arg_dict[name] = value
 
     return arg_dict
 
@@ -319,20 +414,13 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
     meta_args = argv[:separator_ix]
     param_args = argv[separator_ix + 1:]
 
-    # turn meta into a dict, but coerce later
-    meta = _dict_from_argv(meta_args, typemap={}, default_coercion='str')
+    raw_meta = UnparsedArguments.from_argv(meta_args)
 
-    def _read_meta_arg(name):
-        try:
-            return meta.pop(name)
-        except KeyError:
-            raise KeyError("expected argument {} in argv".format(name))
+    job_id = raw_meta.read('--id', int)
+    repetition_id = raw_meta.read('--rep', int)
 
-    job_id = int(_read_meta_arg('--id'))
-    repetition_id = int(_read_meta_arg('--rep'))
-
-    if meta:
-        keys = sorted(meta)
+    if raw_meta:
+        keys = sorted(raw_meta)
         raise TypeError("unexpected meta args: {}".format(', '.join(keys)))
 
     params = _dict_from_argv(param_args,
