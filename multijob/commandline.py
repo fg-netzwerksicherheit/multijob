@@ -305,7 +305,29 @@ def _argv_from_dict(arg_dict, *, typemap=None, default_coercion=None):
 
     return argv
 
-def argv_from_job(job, *, typemap=None, default_coercion=None):
+class JobArgvConfig(object):
+    """Specify how job parameters are encoded.
+
+    Attributes:
+        job_id_key (str): Name of the ``job_id`` attribute.
+        repetition_id_key (str): Name of the ``repetition_id`` attribute.
+    """
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, *, job_id_key, repetition_id_key):
+        self.job_id_key = job_id_key
+        self.repetition_id_key = repetition_id_key
+
+DEFAULT_JOB_ARGV_CONFIG = JobArgvConfig(
+    job_id_key='--id',
+    repetition_id_key='--rep')
+
+def argv_from_job(job,
+                  *,
+                  typemap=None,
+                  default_coercion=None,
+                  job_argv_config=None):
     r"""Format a job as command line arguments.
 
     To get a job object back from these arguments,
@@ -321,6 +343,8 @@ def argv_from_job(job, *, typemap=None, default_coercion=None):
             Optional. Controls how individual params are formatted.
         default_coercion (Coercion):
             Optional. Controls how params without a typemap entry are formatted.
+        job_argv_config (JobArgvConfig):
+            Optional. Controls names of job attributes.
 
     Returns:
         list: The encoded params.
@@ -348,19 +372,40 @@ def argv_from_job(job, *, typemap=None, default_coercion=None):
         >>> argv_from_job(job, typemap=dict(xs=csv_line))
         [..., '--', 'xs=1,2,3']
 
+    Example: customizing job format::
+
+        >>> from multijob.job import Job
+        >>> conf = JobArgvConfig(
+        ...     job_id_key='--job-id',
+        ...     repetition_id_key='--nexecs')
+        >>> job = Job(2, 7, lambda x: x, dict(a='b'))
+        >>> argv_from_job(job, job_argv_config=conf)
+        ['--job-id=2', '--nexecs=7', '--', 'a=b']
+
     """
 
-    argv = []
-    argv.append('--id=' + _string_from_value('--id', job.job_id, None))
-    argv.append('--rep=' + _string_from_value('--rep', job.repetition_id, None))
-    argv.append('--')
-    argv.extend(_argv_from_dict(job.params,
-                                typemap=typemap,
-                                default_coercion=default_coercion))
+    if job_argv_config is None:
+        job_argv_config = DEFAULT_JOB_ARGV_CONFIG
+
+    meta = _argv_from_dict({
+        job_argv_config.job_id_key: job.job_id,
+        job_argv_config.repetition_id_key: job.repetition_id,
+    })
+
+    params = _argv_from_dict(job.params,
+                             typemap=typemap,
+                             default_coercion=default_coercion)
+
+    argv = [*meta, '--', *params]
 
     return argv
 
-def job_from_argv(argv, callback, *, typemap, default_coercion=None):
+def job_from_argv(argv,
+                  callback,
+                  *,
+                  typemap,
+                  default_coercion=None,
+                  job_argv_config=None):
     """Parse command line arguments into a job object.
 
     Args:
@@ -373,6 +418,8 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
             Controls how individual params are parsed.
         default_coercion (Coercion):
             Optional. Controls how params without a typemap entry are formatted.
+        job_argv_config (JobArgvConfig):
+            Optional. Controls names of job attributes.
 
     Returns:
         multijob.job.Job: a runnable job with the params from this argv.
@@ -404,7 +451,24 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
         >>> job = job_from_argv(argv, target, typemap=dict(xs=csv_line))
         >>> job.params['xs']
         [1.2, 3.4, 5.6]
+
+    Example: customizing job format
+
+        >>> def target():
+        ...     pass
+        >>> conf = JobArgvConfig(
+        ...     job_id_key='--job-id',
+        ...     repetition_id_key='--iteration')
+        >>> argv = ['--job-id=15', '--iteration=2', '--', 'a=foo']
+        >>> job = job_from_argv(argv, target,
+        ...                     typemap=dict(a=str),
+        ...                     job_argv_config=conf)
+        >>> (job.job_id, job.repetition_id, job.params)
+        (15, 2, {'a': 'foo'})
     """
+
+    if job_argv_config is None:
+        job_argv_config = DEFAULT_JOB_ARGV_CONFIG
 
     try:
         separator_ix = argv.index('--')
@@ -416,8 +480,8 @@ def job_from_argv(argv, callback, *, typemap, default_coercion=None):
 
     raw_meta = UnparsedArguments.from_argv(meta_args)
 
-    job_id = raw_meta.read('--id', int)
-    repetition_id = raw_meta.read('--rep', int)
+    job_id = raw_meta.read(job_argv_config.job_id_key, int)
+    repetition_id = raw_meta.read(job_argv_config.repetition_id_key, int)
 
     if raw_meta:
         keys = sorted(raw_meta)
