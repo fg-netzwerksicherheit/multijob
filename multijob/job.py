@@ -165,8 +165,8 @@ class JobBuilder(object):
         Example::
 
             >>> builder = JobBuilder()
-            >>> builder.add_range('x', 0, 3, 0.5)
-            [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+            >>> builder.add_range('x', 2, 5, 0.5)
+            [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
         Example::
 
@@ -235,8 +235,8 @@ class JobBuilder(object):
         Example::
 
             >>> builder = JobBuilder()
-            >>> builder.add_linspace('x', 0, 3, 7)
-            [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+            >>> builder.add_linspace('x', 2, 5, 7)
+            [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
         Example::
 
@@ -269,7 +269,7 @@ class JobBuilder(object):
             raise ValueError("num must be at least 2 to include the start and stop")
 
         span = stop - start
-        values = [span * (n / (num - 1)) for n in range(num)]
+        values = [start + span * (n / (num - 1)) for n in range(num)]
 
         self._add_list(param, values)
         return values
