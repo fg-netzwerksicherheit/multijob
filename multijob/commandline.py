@@ -16,6 +16,47 @@ random-access to the command line parameters via :class:`UnparsedArguments`, or
 can apply a particular coercion to a string value via
 :func:`value_from_string`.
 
+To turn a job into a shell command, use :func:`shell_command_from_job`.
+This uses the :func:`shell_word_from_string` function for escaping.
+
+Example: Turning a list of job objects into a command line script:
+
+    >>> from multijob.job import JobBuilder
+    >>> def dummy(): pass
+    >>>
+    >>> # create the jobs
+    >>> builder = JobBuilder()
+    >>> _ = builder.add('a', 2)
+    >>> _ = builder.add_linspace('b', 1.0, 3.0, 3)
+    >>> jobs = builder.build(dummy, repetitions=1)
+    >>>
+    >>> # print the jobs
+    >>> for job in jobs:
+    ...     print(shell_command_from_job('./run-jobs', job))
+    ./run-jobs --id=0 --rep=0 -- a=2 b=1.0
+    ./run-jobs --id=1 --rep=0 -- a=2 b=2.0
+    ./run-jobs --id=2 --rep=0 -- a=2 b=3.0
+
+Example: Decoding arguments inside a script::
+
+    >>> # define a worker function and a typemap for it
+    >>> TYPEMAP = dict(a='int', b='float')
+    >>> def worker(a, b):
+    ...     return a * b
+    ...
+    >>> # argv = sys.argv
+    >>> argv = ['./run-jobs', '--id=2', '--rep=0', '--', 'a=2', 'b=3.0']
+    >>> # skip the first argument
+    >>> argv = argv[1:]
+    >>>
+    >>> # decode the job
+    >>> job = job_from_argv(argv, worker, typemap=TYPEMAP)
+    >>>
+    >>> # run the job
+    >>> result = job.run()
+    >>> result.result
+    6.0
+
 .. class:: Coercion
 
     Coercion from command line args to Python objects.
@@ -34,6 +75,8 @@ can apply a particular coercion to a string value via
     -   ``'bool'``
 
 """
+
+import re
 
 import multijob.job
 
@@ -492,3 +535,94 @@ def job_from_argv(argv,
                              default_coercion=default_coercion)
 
     return multijob.job.Job(job_id, repetition_id, callback, params)
+
+def shell_command_from_job(prefix, job, *,
+                           typemap=None,
+                           default_coercion=None,
+                           job_argv_config=None):
+    """Turn a job into a shell command.
+
+    Args:
+        prefix (str):
+            The command to be invoked.
+            This is a shell script snippet and **will not be escaped**!
+            You are responsible for preventing shell-injection.
+        job (multijob.job.Job):
+            The job to be encoded.
+        typemap (Typemap):
+            Optional. See :func:`argv_from_job`.
+        default_coercion (Coercion):
+            Optional. See :func:`argv_from_job`.
+        job_argv_config (JobArgvConfig):
+            Optional. See :func:`argv_from_job`.
+
+    Returns:
+        str: The job as a shell command.
+
+    Example::
+
+        >>> job = multijob.job.Job(40, 2, lambda x: x, dict(y='foo bar'))
+        >>> print(shell_command_from_job('$RUN_GA', job))
+        $RUN_GA --id=40 --rep=2 -- 'y=foo bar'
+
+    """
+
+    job_argv = argv_from_job(
+        job,
+        typemap=typemap,
+        default_coercion=default_coercion,
+        job_argv_config=job_argv_config)
+
+    return prefix + ' ' + ' '.join(shell_word_from_string(s) for s in job_argv)
+
+SAFE_SHELL_WORDS_RE = re.compile(r'\A[-+a-zA-Z0-9_=!./]+\Z')
+
+def shell_word_from_string(word):
+    r"""Escape arguments for POSIX shells.
+
+    Args:
+        word (str): The word to escape.
+
+    Returns:
+        str: The safely escaped word.
+
+    Example::
+
+        >>> print(shell_word_from_string(""))
+        ''
+        >>> print(shell_word_from_string("foo"))
+        foo
+        >>> print(shell_word_from_string("foo bar"))
+        'foo bar'
+        >>> print(shell_word_from_string("foo'bar'baz"))
+        'foo'\''bar'\''baz'
+    """
+
+    # Posix says:
+    #
+    # The application shall quote the following characters if they are to
+    # represent themselves:
+    #
+    #   |  &  ;  <  >  (  )  $  `  \  "  '  <space>  <tab>  <newline>
+    #
+    #   and the following may need to be quoted under certain circumstances.
+    #   That is, these characters may be special depending on conditions
+    #   described elsewhere in this volume of POSIX.1-2008:
+    #
+    #   *   ?   [   #   ~   =   %
+    #
+    # http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html
+    #
+    # For command arguments the "=" does not need to be quoted.
+    # That leaves us with a couple of safe characters,
+    # see SAFE_SHELL_WORDS_RE
+    #
+    # All other words will be quoted.
+    #
+    # See also: http://stackoverflow.com/q/35817/1521179
+
+    if word == '':
+        return "''"
+    if SAFE_SHELL_WORDS_RE.match(word):
+        return word
+    return "'" + word.replace("'", r"'\''") + "'"
