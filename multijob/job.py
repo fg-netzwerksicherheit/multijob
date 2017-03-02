@@ -1,18 +1,18 @@
 # coding: utf8
 
-"""Job configurations
+"""Create jobs in various configurations and run them.
 
-.. autosummary::
-    Job
-    JobBuilder
-    JobResult
-
+The :class:`JobBuilder` class lets you build a combination of parameters easily.
+It produces a list of :class:`Job` instances.
+When running a job, you get a :class:`JobResult`.
 """
 
 import itertools
 
 class Job(object):
-    """A concrete set of configuration parameters.
+    """A concrete, runnable set of configuration parameters.
+
+    Do not create directly – use :class:`JobBuilder` instead!
 
     Args:
         job_id: identify this set of parameters
