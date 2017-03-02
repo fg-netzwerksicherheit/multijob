@@ -57,23 +57,6 @@ Example: Decoding arguments inside a script::
     >>> result.result
     6.0
 
-.. class:: Coercion
-
-    Coercion from command line args to Python objects.
-
-    Coercions describe how command line arguments are converted to Python data
-    types. There isn't an actual coercion class, but this concept is used
-    throughout the module documentation.
-
-    Coercions are functions that take a single parameter (the string to be
-    coerced) and return a single Python object.  Coercions may also be *named*.
-    Instead of supplying a callback, the coercion may be one of:
-
-    -   ``'str'``
-    -   ``'int'``
-    -   ``'float'``
-    -   ``'bool'``
-
 """
 
 import re
@@ -100,13 +83,6 @@ def _parse_bool(value):
         return False
     raise ValueError("Expected 'True' or 'False' but got {!r}".format(value))
 
-NAMED_COERCIONS = dict(
-    str=str,
-    int=int,
-    float=float,
-    bool=_parse_bool,
-)
-
 def _update_ex_message(ex, new_message, *args, **kwargs):
     """Given an exception, prepend something to its message.
 
@@ -124,6 +100,148 @@ def _update_ex_message(ex, new_message, *args, **kwargs):
     new_message = new_message.format(*args, **kwargs)
     ex.args = (new_message + "\n" + ex.args[0], *ex.args[1:])
 
+def _perform_coercion(name, value, coercion):
+    try:
+        return coercion(value)
+    except ValueError as ex:
+        _update_ex_message(ex, "Could not coerce {!r}={!r}:", name, value)
+        raise
+
+def _check_coercion(name, coercion, *, named_coercions):
+    if named_coercions is not None:
+        if isinstance(coercion, str):
+            coercion = named_coercions[coercion]
+
+    if coercion is None:
+        return None
+
+    if callable(coercion):
+        return coercion
+
+    raise TypeError(
+        '{!r} coercion must be callable: {!r}'.format(name, coercion))
+
+class _Default(object):
+    # pylint: disable=too-few-public-methods
+    def __repr__(self):
+        return '_Default'
+
+_Default = _Default()  # pylint: disable=invalid-name
+
+class Coercion(object):  # pylint: disable=too-few-public-methods
+    """
+    Coercion from command line args to Python objects.
+
+    Coercions describe how command line arguments are converted to Python data
+    types. This concept is used throughout the module documentation.
+
+    Coercions are functions that take a single parameter (the string to be
+    coerced) and return a single Python object. Coercions may also be *named*.
+    Instead of supplying a callback, the coercion may be one of:
+
+    -   ``'str'``
+    -   ``'int'``
+    -   ``'float'``
+    -   ``'bool'``
+
+    Example: coercion function::
+
+        >>> Coercion.of(int, paramname='x')('x', '42')
+        42
+        >>> Coercion.of(str, paramname='y')('y', '42')
+        '42'
+
+    Example: named coercion::
+
+        >>> Coercion.of('bool', paramname='p')('p', 'False')
+        False
+        >>> Coercion.of('float', paramname='f')('f', '4.2')
+        4.2
+
+    Example: coercions are coercions::
+
+        >>> a = Coercion.of(int, paramname='x')
+        >>> Coercion.of(a, paramname='y')
+        <multijob.commandline.Coercion object at 0x...>
+
+    Example: coercion must be callable::
+
+        >>> Coercion.of(42, paramname='blorp')
+        Traceback (most recent call last):
+        TypeError: 'blorp' coercion must be callable: 42
+
+    Example: explains error when coercion fails::
+
+        >>> def bad_coercion(value):
+        ...     raise ValueError("nope")
+        ...
+        >>> coercion = Coercion.of(bad_coercion, paramname='x')
+        >>> coercion('x', '42')
+        Traceback (most recent call last):
+        ValueError: Could not coerce 'x'='42':
+        nope
+
+    Example: propagates Nones::
+
+        >>> Coercion.of(None, paramname='x') is None
+        True
+
+    """
+
+    NAMED_COERCIONS = dict(
+        str=str,
+        int=int,
+        float=float,
+        bool=_parse_bool,
+    )
+
+    __private = []
+
+    def __init__(self, _private, _parser):
+        assert _private is Coercion.__private
+        self._parser = _parser
+
+    @staticmethod
+    def of(name_or_callable, *, paramname, named_coercions=_Default):
+        # pylint: disable=invalid-name
+        """Create/check a coercion.
+
+        Calling this functions turns a callable or named coercion into a proper
+        coercion object with suitable error handling.
+
+        Args:
+            name_or_callable (str|Callable|Coercion):
+                The coercion.
+            paramname (str):
+                The name of the parameter which we're going to coerce.
+                This is only used for error messages.
+            named_coercions (dict):
+                Optional. Available named coercions.
+                Defaults to ``Coercion.NAMED_COERCIONS``.
+
+        Returns:
+            Coercion: A coercion object with suitable error handling.
+            Returns *None* if *name_or_callable* was *None*.
+
+        """
+
+        if named_coercions is _Default:
+            named_coercions = Coercion.NAMED_COERCIONS
+
+        coercion = _check_coercion(
+            paramname, name_or_callable, named_coercions=named_coercions)
+
+        if coercion is None:
+            return None
+
+        if isinstance(coercion, Coercion):
+            return coercion
+
+        return Coercion(Coercion.__private, coercion)
+
+    def __call__(self, name, value):
+        return _perform_coercion(name, value, self._parser)
+
 def value_from_string(name, value, coercion):
     """Parse a value from a string with a given coercion.
 
@@ -133,7 +251,7 @@ def value_from_string(name, value, coercion):
     Args:
         name (str): The name of this argument, needed for diagnostics.
         value (str): The string to coerce.
-        coercion (str|Coercion): a named coercion or a coercion callback.
+        coercion (Coercion): a :class:`Coercion`. See :meth:`Coercion.of` for details on acceptable values.
 
     Returns:
         the coerced value.
@@ -143,50 +261,19 @@ def value_from_string(name, value, coercion):
         >>> value_from_string('x', '42', int)
         42
 
-    Example: requires a coercion::
+    Example: complains when no coercion was provided::
 
-        >>> value_from_string('x', '42', None)
+        >>> value_from_string('y', '13', None)
         Traceback (most recent call last):
-        TypeError: no coercion found for 'x'='42'
-
-    Example: named coercions::
-
-        >>> value_from_string('x', 'False', 'bool')
-        False
-
-    Example: coercions must be callable::
-
-        >>> value_from_string('x', '42', 123)
-        Traceback (most recent call last):
-        TypeError: 'x' coercion must be callable: 123
-
-    Example: reports error when coercion failed::
-
-        >>> def bad_coercion(value):
-        ...     raise ValueError("nope")
-        ...
-        >>> value_from_string('x', '42', bad_coercion)
-        Traceback (most recent call last):
-        ValueError: Could not coerce 'x'='42':
-        nope
+        TypeError: no coercion found for 'y'='13'
     """
+
+    coercion = Coercion.of(coercion, paramname=name)
 
     if coercion is None:
         raise TypeError("no coercion found for {!r}={!r}".format(name, value))
 
-    if isinstance(coercion, str):
-        coercion = NAMED_COERCIONS[coercion]
-
-    if not callable(coercion):
-        raise TypeError(
-            "{!r} coercion must be callable: {!r}".format(name, coercion),
-        )
-
-    try:
-        return coercion(value)
-    except ValueError as ex:
-        _update_ex_message(ex, "Could not coerce {!r}={!r}:", name, value)
-        raise
+    return coercion(name, value)
 
 def _string_from_value(name, value, coercion):
     """Turn a value into a string, optionally with a given coercion.
@@ -223,16 +310,9 @@ def _string_from_value(name, value, coercion):
     if coercion is None:
         coercion = str
 
-    if not callable(coercion):
-        raise TypeError(
-            "{!r} coercion must be callable: {!r}".format(name, coercion)
-        )
+    coercion = Coercion.of(coercion, paramname=name, named_coercions=None)
 
-    try:
-        return coercion(value)
-    except ValueError as ex:
-        _update_ex_message(ex, "Could not coerce {!r}={!r}:", name, value)
-        raise
+    return coercion(name, value)
 
 def _unparsed_dict_from_argv(argv):
     """Split command line arguments into a dict, without applying coercions.
