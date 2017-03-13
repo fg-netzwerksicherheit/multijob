@@ -1,6 +1,6 @@
-==========================================================================
-Multijob – define multiple job configurations and execute them in parallel
-==========================================================================
+===============================================================
+Multijob – distributed execution of multiple job configurations
+===============================================================
 
 When you have a job that you need to run many times in many configurations – this module is the solution.
 
