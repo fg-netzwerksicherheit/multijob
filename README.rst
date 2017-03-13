@@ -114,6 +114,8 @@ Then we only need a worker function, and can recreate the job::
 
 Typically, you'd then write the result to a file, using the job's :attr:`~multijob.job.Job.job_id` and :attr:`~multijob.job.Job.repetition_id` to construct the filename.
 
+For the example of evolutionary algorithms, this is discussed in more detail int the :doc:`parallelTutorial` tutorial.
+
 Corresponding command line argument parsers for other languages may be implemented in the future.
 
 Copyright

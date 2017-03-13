@@ -15,6 +15,14 @@ Reference
 .. toctree::
     ./api/multijob.rst
 
+Tutorials
+=========
+
+.. toctree::
+    :maxdepth: 1
+
+    ./parallelTutorial.rst
+
 Indices and tables
 ==================
 

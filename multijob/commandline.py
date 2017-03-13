@@ -2,6 +2,9 @@
 
 """Turn job objects into command line arguments and back again.
 
+The usage of these functions is explained in more detail in the
+:doc:`../parallelTutorial` tutorial.
+
 You should use :func:`job_from_argv` and :func:`argv_from_job` to convert
 between :class:`multijob.job.Job` instances and command line parameters.  These
 functions use *typemaps* and *coercions*.
