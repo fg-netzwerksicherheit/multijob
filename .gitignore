@@ -14,7 +14,7 @@ __pycache__/
 /.eggs/
 /htmlcov/
 *.egg-info/
-/docs/api/
+/docs-src/api/
 
 # exclude my virtualenv
 /.py3
