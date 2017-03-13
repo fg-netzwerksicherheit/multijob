@@ -1,0 +1,24 @@
+/* overide some questionable Alabaster theme choices */
+
+dl dl pre {
+    margin-left: 0;
+    padding-left: 30px;
+}
+
+dd div.admonition {
+    margin-left: 0;
+    padding-left: 30px;
+}
+
+/* make declarations stand out more */
+
+dl.data > dt,
+dl.function > dt,
+dl.method > dt,
+dl.staticmethod > dt,
+dl.class > dt{
+    border-color: lightgray;
+    border-width: 0.25em 0 0 0.25em;
+    padding: 0 0 0 0.25em;
+    border-style: solid;
+}

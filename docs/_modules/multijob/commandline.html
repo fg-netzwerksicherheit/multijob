@@ -1,0 +1,816 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>multijob.commandline &#8212; Multijob 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for multijob.commandline</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding: utf8</span>
+
+<span class="sd">&quot;&quot;&quot;Turn job objects into command line arguments and back again.</span>
+
+<span class="sd">The usage of these functions is explained in more detail in the</span>
+<span class="sd">:doc:`../parallelTutorial` tutorial.</span>
+
+<span class="sd">You should use :func:`job_from_argv` and :func:`argv_from_job` to convert</span>
+<span class="sd">between :class:`multijob.job.Job` instances and command line parameters.  These</span>
+<span class="sd">functions use *typemaps* and *coercions*.</span>
+
+<span class="sd">A typemap is a dictionary that maps named params to a specific coercion.</span>
+
+<span class="sd">A coercion is a function that turns a string into a Python data type or back</span>
+<span class="sd">(see :class:`Coercion`).</span>
+
+<span class="sd">If you need to take more control over parsing, you can get convenient</span>
+<span class="sd">random-access to the command line parameters via :class:`UnparsedArguments`, or</span>
+<span class="sd">can apply a particular coercion to a string value via</span>
+<span class="sd">:func:`value_from_string`.</span>
+
+<span class="sd">To turn a job into a shell command, use :func:`shell_command_from_job`.</span>
+<span class="sd">This uses the :func:`shell_word_from_string` function for escaping.</span>
+
+<span class="sd">Example: Turning a list of job objects into a command line script:</span>
+
+<span class="sd">    &gt;&gt;&gt; from multijob.job import JobBuilder</span>
+<span class="sd">    &gt;&gt;&gt; def dummy(): pass</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; # create the jobs</span>
+<span class="sd">    &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">    &gt;&gt;&gt; _ = builder.add(&#39;a&#39;, 2)</span>
+<span class="sd">    &gt;&gt;&gt; _ = builder.add_linspace(&#39;b&#39;, 1.0, 3.0, 3)</span>
+<span class="sd">    &gt;&gt;&gt; jobs = builder.build(dummy, repetitions=1)</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; # print the jobs</span>
+<span class="sd">    &gt;&gt;&gt; for job in jobs:</span>
+<span class="sd">    ...     print(shell_command_from_job(&#39;./run-jobs&#39;, job))</span>
+<span class="sd">    ./run-jobs --id=0 --rep=0 -- a=2 b=1.0</span>
+<span class="sd">    ./run-jobs --id=1 --rep=0 -- a=2 b=2.0</span>
+<span class="sd">    ./run-jobs --id=2 --rep=0 -- a=2 b=3.0</span>
+
+<span class="sd">Example: Decoding arguments inside a script::</span>
+
+<span class="sd">    &gt;&gt;&gt; # define a worker function and a typemap for it</span>
+<span class="sd">    &gt;&gt;&gt; TYPEMAP = dict(a=&#39;int&#39;, b=&#39;float&#39;)</span>
+<span class="sd">    &gt;&gt;&gt; def worker(a, b):</span>
+<span class="sd">    ...     return a * b</span>
+<span class="sd">    ...</span>
+<span class="sd">    &gt;&gt;&gt; # argv = sys.argv</span>
+<span class="sd">    &gt;&gt;&gt; argv = [&#39;./run-jobs&#39;, &#39;--id=2&#39;, &#39;--rep=0&#39;, &#39;--&#39;, &#39;a=2&#39;, &#39;b=3.0&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; # skip the first argument</span>
+<span class="sd">    &gt;&gt;&gt; argv = argv[1:]</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; # decode the job</span>
+<span class="sd">    &gt;&gt;&gt; job = job_from_argv(argv, worker, typemap=TYPEMAP)</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt; # run the job</span>
+<span class="sd">    &gt;&gt;&gt; result = job.run()</span>
+<span class="sd">    &gt;&gt;&gt; result.result</span>
+<span class="sd">    6.0</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">multijob.job</span>
+
+<span class="k">def</span> <span class="nf">_parse_bool</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse a boolean string &quot;True&quot; or &quot;False&quot;.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; _parse_bool(&quot;True&quot;)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; _parse_bool(&quot;False&quot;)</span>
+<span class="sd">        False</span>
+<span class="sd">        &gt;&gt;&gt; _parse_bool(&quot;glorp&quot;)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        ValueError: Expected &#39;True&#39; or &#39;False&#39; but got &#39;glorp&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;True&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="s1">&#39;False&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Expected &#39;True&#39; or &#39;False&#39; but got </span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">_update_ex_message</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">new_message</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Given an exception, prepend something to its message.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; ex = TypeError(&quot;bad type&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; _update_ex_message(ex, &quot;caught with x={}:&quot;, 42)</span>
+<span class="sd">        &gt;&gt;&gt; raise ex</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        TypeError: caught with x=42:</span>
+<span class="sd">        bad type</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">new_message</span> <span class="o">=</span> <span class="n">new_message</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">ex</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="p">(</span><span class="n">new_message</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">ex</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">*</span><span class="n">ex</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+
+<span class="k">def</span> <span class="nf">_perform_coercion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">coercion</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">coercion</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+        <span class="n">_update_ex_message</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="s2">&quot;Could not coerce </span><span class="si">{!r}</span><span class="s2">=</span><span class="si">{!r}</span><span class="s2">:&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">raise</span>
+
+<span class="k">def</span> <span class="nf">_check_coercion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">coercion</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">named_coercions</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">named_coercions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">coercion</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">coercion</span> <span class="o">=</span> <span class="n">named_coercions</span><span class="p">[</span><span class="n">coercion</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">coercion</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">callable</span><span class="p">(</span><span class="n">coercion</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">coercion</span>
+
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+        <span class="s1">&#39;</span><span class="si">{!r}</span><span class="s1"> coercion must be callable: </span><span class="si">{!r}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">coercion</span><span class="p">))</span>
+
+<span class="k">class</span> <span class="nc">_Default</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="c1"># pylint: disable=too-few-public-methods</span>
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s1">&#39;_Default&#39;</span>
+
+<span class="n">_Default</span> <span class="o">=</span> <span class="n">_Default</span><span class="p">()</span>  <span class="c1"># pylint: disable=invalid-name</span>
+
+<div class="viewcode-block" id="Coercion"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.Coercion">[docs]</a><span class="k">class</span> <span class="nc">Coercion</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>  <span class="c1"># pylint: disable=too-few-public-methods</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Coercion from command line args to Python objects.</span>
+
+<span class="sd">    Coercions describe how command line arguments are converted to Python data</span>
+<span class="sd">    types. This concept is used throughout the module documentation.</span>
+
+<span class="sd">    Coercions are functions that take a single parameter (the string to be</span>
+<span class="sd">    coerced) and return a single Python object. Coercions may also be *named*.</span>
+<span class="sd">    Instead of supplying a callback, the coercion may be one of:</span>
+
+<span class="sd">    -   ``&#39;str&#39;``</span>
+<span class="sd">    -   ``&#39;int&#39;``</span>
+<span class="sd">    -   ``&#39;float&#39;``</span>
+<span class="sd">    -   ``&#39;bool&#39;``</span>
+
+<span class="sd">    Example: coercion function::</span>
+
+<span class="sd">        &gt;&gt;&gt; Coercion.of(int, paramname=&#39;x&#39;)(&#39;x&#39;, &#39;42&#39;)</span>
+<span class="sd">        42</span>
+<span class="sd">        &gt;&gt;&gt; Coercion.of(str, paramname=&#39;y&#39;)(&#39;y&#39;, &#39;42&#39;)</span>
+<span class="sd">        &#39;42&#39;</span>
+
+<span class="sd">    Example: named coercion::</span>
+
+<span class="sd">        &gt;&gt;&gt; Coercion.of(&#39;bool&#39;, paramname=&#39;p&#39;)(&#39;p&#39;, &#39;False&#39;)</span>
+<span class="sd">        False</span>
+<span class="sd">        &gt;&gt;&gt; Coercion.of(&#39;float&#39;, paramname=&#39;f&#39;)(&#39;f&#39;, &#39;4.2&#39;)</span>
+<span class="sd">        4.2</span>
+
+<span class="sd">    Example: coercions are coercions::</span>
+
+<span class="sd">        &gt;&gt;&gt; a = Coercion.of(int, paramname=&#39;x&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; Coercion.of(a, paramname=&#39;y&#39;)</span>
+<span class="sd">        &lt;multijob.commandline.Coercion object at 0x...&gt;</span>
+
+<span class="sd">    Example: coercion must be callable::</span>
+
+<span class="sd">        &gt;&gt;&gt; Coercion.of(42, paramname=&#39;blorp&#39;)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        TypeError: &#39;blorp&#39; coercion must be callable: 42</span>
+
+<span class="sd">    Example: explains error when coercion fails::</span>
+
+<span class="sd">        &gt;&gt;&gt; def bad_coercion(value):</span>
+<span class="sd">        ...     raise ValueError(&quot;nope&quot;)</span>
+<span class="sd">        ...</span>
+<span class="sd">        &gt;&gt;&gt; coercion = Coercion.of(bad_coercion, paramname=&#39;x&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; coercion(&#39;x&#39;, &#39;42&#39;)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        ValueError: Could not coerce &#39;x&#39;=&#39;42&#39;:</span>
+<span class="sd">        nope</span>
+
+<span class="sd">    Example: propagates Nones::</span>
+
+<span class="sd">        &gt;&gt;&gt; Coercion.of(None, paramname=&#39;x&#39;) is None</span>
+<span class="sd">        True</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">NAMED_COERCIONS</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="nb">str</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="nb">int</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="nb">float</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="nb">bool</span><span class="o">=</span><span class="n">_parse_bool</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">__private</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_private</span><span class="p">,</span> <span class="n">_parser</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="n">_private</span> <span class="ow">is</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">__private</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_parser</span> <span class="o">=</span> <span class="n">_parser</span>
+
+    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="Coercion.of"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.Coercion.of">[docs]</a>    <span class="k">def</span> <span class="nf">of</span><span class="p">(</span><span class="n">name_or_callable</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">paramname</span><span class="p">,</span> <span class="n">named_coercions</span><span class="o">=</span><span class="n">_Default</span><span class="p">):</span>
+        <span class="c1"># pylint: disable=invalid-name</span>
+        <span class="sd">&quot;&quot;&quot;Create/check a coercion.</span>
+
+<span class="sd">        Calling this functions turns a callable or named coercion into a proper</span>
+<span class="sd">        coercion object with suitable error handling.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name_or_callable (str|Callable|Coercion):</span>
+<span class="sd">                The coercion.</span>
+<span class="sd">            paramname (str):</span>
+<span class="sd">                The name of the parameter which we&#39;re going to coerce.</span>
+<span class="sd">                This is only used for error messages.</span>
+<span class="sd">            named_coercions (dict):</span>
+<span class="sd">                Optional. Available named coercions.</span>
+<span class="sd">                Defaults to ``Coercion.NAMED_COERCIONS``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Coercion: A coercion object with suitable error handling.</span>
+<span class="sd">            Returns *None* if *name_or_callable* was *None*.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">named_coercions</span> <span class="ow">is</span> <span class="n">_Default</span><span class="p">:</span>
+            <span class="n">named_coercions</span> <span class="o">=</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">NAMED_COERCIONS</span>
+
+        <span class="n">coercion</span> <span class="o">=</span> <span class="n">_check_coercion</span><span class="p">(</span>
+            <span class="n">paramname</span><span class="p">,</span> <span class="n">name_or_callable</span><span class="p">,</span> <span class="n">named_coercions</span><span class="o">=</span><span class="n">named_coercions</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">coercion</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">coercion</span><span class="p">,</span> <span class="n">Coercion</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">coercion</span>
+
+        <span class="k">return</span> <span class="n">Coercion</span><span class="p">(</span><span class="n">Coercion</span><span class="o">.</span><span class="n">__private</span><span class="p">,</span> <span class="n">coercion</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">_perform_coercion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parser</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="value_from_string"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.value_from_string">[docs]</a><span class="k">def</span> <span class="nf">value_from_string</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">coercion</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse a value from a string with a given coercion.</span>
+
+<span class="sd">    This function primarily adds error handling,</span>
+<span class="sd">    and contains support for named coercions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name (str): The name of this argument, needed for diagnostics.</span>
+<span class="sd">        value (str): The string to coerce.</span>
+<span class="sd">        coercion (Coercion): a :class:`Coercion`. See :meth:`Coercion.of` for details on acceptable values.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        the coerced value.</span>
+
+<span class="sd">    Example: normal usage::</span>
+
+<span class="sd">        &gt;&gt;&gt; value_from_string(&#39;x&#39;, &#39;42&#39;, int)</span>
+<span class="sd">        42</span>
+
+<span class="sd">    Example: complains when no coercion was provided::</span>
+
+<span class="sd">        &gt;&gt;&gt; value_from_string(&#39;y&#39;, &#39;13&#39;, None)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        TypeError: no coercion found for &#39;y&#39;=&#39;13&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">coercion</span> <span class="o">=</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">coercion</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">coercion</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;no coercion found for </span><span class="si">{!r}</span><span class="s2">=</span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">coercion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+
+<span class="k">def</span> <span class="nf">_string_from_value</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">coercion</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Turn a value into a string, optionally with a given coercion.</span>
+
+<span class="sd">    Example: normal usage::</span>
+
+<span class="sd">        &gt;&gt;&gt; _string_from_value(&#39;x&#39;, 42, str)</span>
+<span class="sd">        &#39;42&#39;</span>
+
+<span class="sd">    Example: coercion defaults to str::</span>
+
+<span class="sd">        &gt;&gt;&gt; _string_from_value(&#39;x&#39;, 42, None)</span>
+<span class="sd">        &#39;42&#39;</span>
+
+<span class="sd">    Example: coercion must be callable::</span>
+
+<span class="sd">        &gt;&gt;&gt; _string_from_value(&#39;x&#39;, 42, &#39;int&#39;)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        TypeError: &#39;x&#39; coercion must be callable: &#39;int&#39;</span>
+
+<span class="sd">    Example: reports error when coercion failed::</span>
+
+<span class="sd">        &gt;&gt;&gt; class EvilValue(object):</span>
+<span class="sd">        ...     def __str__(self):</span>
+<span class="sd">        ...         raise ValueError(&quot;I don&#39;t want to go!&quot;)</span>
+<span class="sd">        ...</span>
+<span class="sd">        &gt;&gt;&gt; _string_from_value(&#39;x&#39;, EvilValue(), str)</span>
+<span class="sd">        Traceback (most recent call last):</span>
+<span class="sd">        ValueError: Could not coerce &#39;x&#39;=&lt;multijob.commandline.EvilValue object at 0x...&gt;:</span>
+<span class="sd">        I don&#39;t want to go!</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">coercion</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">coercion</span> <span class="o">=</span> <span class="nb">str</span>
+
+    <span class="n">coercion</span> <span class="o">=</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">coercion</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">named_coercions</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">coercion</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">_unparsed_dict_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Split command line arguments into a dict, without applying coercions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">arg_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">argv</span><span class="p">:</span>
+        <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="o">=</span> <span class="n">arg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">arg_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">return</span> <span class="n">arg_dict</span>
+
+<div class="viewcode-block" id="UnparsedArguments"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.UnparsedArguments">[docs]</a><span class="k">class</span> <span class="nc">UnparsedArguments</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A collection of unnamed arguments.</span>
+
+<span class="sd">    This may be useful if you have to do some parsing manually.</span>
+
+<span class="sd">    Use :meth:`from_argv` to construct this object from an argv array.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        args (dict): the name-value command line parameters.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_args</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="UnparsedArguments.from_argv"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.UnparsedArguments.from_argv">[docs]</a>    <span class="k">def</span> <span class="nf">from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create UnparsedArguments from an argv array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="n">UnparsedArguments</span><span class="p">(</span><span class="n">_unparsed_dict_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="UnparsedArguments.read"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.UnparsedArguments.read">[docs]</a>    <span class="k">def</span> <span class="nf">read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">coercion</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Consume and coerce a named argument.</span>
+
+<span class="sd">        Since the argument is consumed, it cannot be consumed again.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            name (str): The name of the argument to consume.</span>
+<span class="sd">            coercion (Coercion): The coercion to apply to this value.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            the coerced value.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: when no such argument name exists.</span>
+<span class="sd">            ValueError: when the value can&#39;t be coerced.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_args</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;expected </span><span class="si">{!r}</span><span class="s2"> in argv&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">value_from_string</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">coercion</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_args</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_args</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_dict_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">typemap</span><span class="p">,</span> <span class="n">default_coercion</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse command line args to a dict.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; argv = [&#39;a=42&#39;, &#39;b=True&#39;, &#39;c=foo=bar&#39;, &#39;d=42&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; TYPEMAP = dict(a=&#39;int&#39;, b=&#39;bool&#39;, c=&#39;str&#39;, d=&#39;str&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; argd = _dict_from_argv(argv, typemap=TYPEMAP)</span>
+<span class="sd">        &gt;&gt;&gt; for name in sorted(argd.keys()):</span>
+<span class="sd">        ...     value = argd[name]</span>
+<span class="sd">        ...     typename = type(value).__name__</span>
+<span class="sd">        ...     print(&quot;{}: {} = {!r}&quot;.format(name, typename, value))</span>
+<span class="sd">        a: int = 42</span>
+<span class="sd">        b: bool = True</span>
+<span class="sd">        c: str = &#39;foo=bar&#39;</span>
+<span class="sd">        d: str = &#39;42&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">arg_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="n">unparsed</span> <span class="o">=</span> <span class="n">UnparsedArguments</span><span class="o">.</span><span class="n">from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">unparsed</span><span class="p">):</span>
+        <span class="n">coercion</span> <span class="o">=</span> <span class="n">typemap</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">default_coercion</span><span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">unparsed</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">coercion</span><span class="p">)</span>
+        <span class="n">arg_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">return</span> <span class="n">arg_dict</span>
+
+<span class="k">def</span> <span class="nf">_argv_from_dict</span><span class="p">(</span><span class="n">arg_dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">default_coercion</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Format a dict as command line args.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; argd = dict(a=42, b=True, c=&#39;foo=bar&#39;, d=&#39;42&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; _argv_from_dict(argd)</span>
+<span class="sd">        [&#39;a=42&#39;, &#39;b=True&#39;, &#39;c=foo=bar&#39;, &#39;d=42&#39;]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">typemap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">typemap</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="n">argv</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">arg_dict</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">arg_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="n">coercion</span> <span class="o">=</span> <span class="n">typemap</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">default_coercion</span><span class="p">)</span>
+        <span class="n">coerced_value</span> <span class="o">=</span> <span class="n">_string_from_value</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">coercion</span><span class="p">)</span>
+        <span class="n">argv</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{}</span><span class="s2">=</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">coerced_value</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">argv</span>
+
+<div class="viewcode-block" id="JobArgvConfig"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.JobArgvConfig">[docs]</a><span class="k">class</span> <span class="nc">JobArgvConfig</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Specify how job parameters are encoded.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        job_id_key (str): Name of the ``job_id`` attribute.</span>
+<span class="sd">        repetition_id_key (str): Name of the ``repetition_id`` attribute.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># pylint: disable=too-few-public-methods</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">job_id_key</span><span class="p">,</span> <span class="n">repetition_id_key</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">job_id_key</span> <span class="o">=</span> <span class="n">job_id_key</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repetition_id_key</span> <span class="o">=</span> <span class="n">repetition_id_key</span></div>
+
+<span class="n">DEFAULT_JOB_ARGV_CONFIG</span> <span class="o">=</span> <span class="n">JobArgvConfig</span><span class="p">(</span>
+    <span class="n">job_id_key</span><span class="o">=</span><span class="s1">&#39;--id&#39;</span><span class="p">,</span>
+    <span class="n">repetition_id_key</span><span class="o">=</span><span class="s1">&#39;--rep&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="argv_from_job"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.argv_from_job">[docs]</a><span class="k">def</span> <span class="nf">argv_from_job</span><span class="p">(</span><span class="n">job</span><span class="p">,</span>
+                  <span class="o">*</span><span class="p">,</span>
+                  <span class="n">typemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                  <span class="n">default_coercion</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                  <span class="n">job_argv_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Format a job as command line arguments.</span>
+
+<span class="sd">    To get a job object back from these arguments,</span>
+<span class="sd">    use :func:`job_from_argv`.</span>
+
+<span class="sd">    The ``job.callback`` will not be stored</span>
+<span class="sd">    and will have to be provided explicitly when parsing the arguments.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        job (multijob.job):</span>
+<span class="sd">            The job to format.</span>
+<span class="sd">        typemap (Typemap):</span>
+<span class="sd">            Optional. Controls how individual params are formatted.</span>
+<span class="sd">        default_coercion (Coercion):</span>
+<span class="sd">            Optional. Controls how params without a typemap entry are formatted.</span>
+<span class="sd">        job_argv_config (JobArgvConfig):</span>
+<span class="sd">            Optional. Controls names of job attributes.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: The encoded params.</span>
+
+<span class="sd">    Example: simple usage::</span>
+
+<span class="sd">        &gt;&gt;&gt; from multijob.job import Job</span>
+<span class="sd">        &gt;&gt;&gt; def target(): pass</span>
+<span class="sd">        &gt;&gt;&gt; job = Job(42, 3, target, dict(a=42, b=True, c=&#39;foo&#39;))</span>
+<span class="sd">        &gt;&gt;&gt; argv_from_job(job)</span>
+<span class="sd">        [&#39;--id=42&#39;, &#39;--rep=3&#39;, &#39;--&#39;, &#39;a=42&#39;, &#39;b=True&#39;, &#39;c=foo&#39;]</span>
+
+<span class="sd">    Example: storing a list::</span>
+
+<span class="sd">        &gt;&gt;&gt; from multijob.job import Job</span>
+<span class="sd">        &gt;&gt;&gt; import csv</span>
+<span class="sd">        &gt;&gt;&gt; import io</span>
+<span class="sd">        &gt;&gt;&gt; def csv_line(items):</span>
+<span class="sd">        ...     out = io.StringIO()</span>
+<span class="sd">        ...     csv.writer(out).writerow(items)</span>
+<span class="sd">        ...     return out.getvalue().strip(&#39;\r\n&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; def target():</span>
+<span class="sd">        ...     pass</span>
+<span class="sd">        &gt;&gt;&gt; job = Job(3, 0, target, dict(xs=[1, 2, 3]))</span>
+<span class="sd">        &gt;&gt;&gt; argv_from_job(job, typemap=dict(xs=csv_line))</span>
+<span class="sd">        [..., &#39;--&#39;, &#39;xs=1,2,3&#39;]</span>
+
+<span class="sd">    Example: customizing job format::</span>
+
+<span class="sd">        &gt;&gt;&gt; from multijob.job import Job</span>
+<span class="sd">        &gt;&gt;&gt; conf = JobArgvConfig(</span>
+<span class="sd">        ...     job_id_key=&#39;--job-id&#39;,</span>
+<span class="sd">        ...     repetition_id_key=&#39;--nexecs&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; job = Job(2, 7, lambda x: x, dict(a=&#39;b&#39;))</span>
+<span class="sd">        &gt;&gt;&gt; argv_from_job(job, job_argv_config=conf)</span>
+<span class="sd">        [&#39;--job-id=2&#39;, &#39;--nexecs=7&#39;, &#39;--&#39;, &#39;a=b&#39;]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">job_argv_config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">job_argv_config</span> <span class="o">=</span> <span class="n">DEFAULT_JOB_ARGV_CONFIG</span>
+
+    <span class="n">meta</span> <span class="o">=</span> <span class="n">_argv_from_dict</span><span class="p">({</span>
+        <span class="n">job_argv_config</span><span class="o">.</span><span class="n">job_id_key</span><span class="p">:</span> <span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span>
+        <span class="n">job_argv_config</span><span class="o">.</span><span class="n">repetition_id_key</span><span class="p">:</span> <span class="n">job</span><span class="o">.</span><span class="n">repetition_id</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="n">_argv_from_dict</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">params</span><span class="p">,</span>
+                             <span class="n">typemap</span><span class="o">=</span><span class="n">typemap</span><span class="p">,</span>
+                             <span class="n">default_coercion</span><span class="o">=</span><span class="n">default_coercion</span><span class="p">)</span>
+
+    <span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">meta</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="o">*</span><span class="n">params</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">argv</span></div>
+
+<div class="viewcode-block" id="job_from_argv"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.job_from_argv">[docs]</a><span class="k">def</span> <span class="nf">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span>
+                  <span class="n">callback</span><span class="p">,</span>
+                  <span class="o">*</span><span class="p">,</span>
+                  <span class="n">typemap</span><span class="p">,</span>
+                  <span class="n">default_coercion</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                  <span class="n">job_argv_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Parse command line arguments into a job object.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        argv (list):</span>
+<span class="sd">            The arguments.</span>
+<span class="sd">        callback (callable):</span>
+<span class="sd">            A function to invoke with the params,</span>
+<span class="sd">            see :class:`multijob.job.Job` for details.</span>
+<span class="sd">        typemap (Typemap):</span>
+<span class="sd">            Controls how individual params are parsed.</span>
+<span class="sd">        default_coercion (Coercion):</span>
+<span class="sd">            Optional. Controls how params without a typemap entry are formatted.</span>
+<span class="sd">        job_argv_config (JobArgvConfig):</span>
+<span class="sd">            Optional. Controls names of job attributes.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        multijob.job.Job: a runnable job with the params from this argv.</span>
+
+<span class="sd">    Example: simple usage::</span>
+
+<span class="sd">        &gt;&gt;&gt; def target(a, b, c):</span>
+<span class="sd">        ...     print(&quot;Args: a={!r}, b={!r}, c={!r}&quot;.format(a, b, c))</span>
+<span class="sd">        ...     return &quot;some value&quot;</span>
+<span class="sd">        ...</span>
+<span class="sd">        &gt;&gt;&gt; argv = [&#39;--id=42&#39;, &#39;--rep=3&#39;, &#39;--&#39;, &#39;a=42&#39;, &#39;b=True&#39;, &#39;c=foo&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; TYPEMAP = dict(a=&#39;int&#39;, b=&#39;bool&#39;, c=&#39;str&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; job = job_from_argv(argv, target, typemap=TYPEMAP)</span>
+<span class="sd">        &gt;&gt;&gt; (job.job_id, job.repetition_id)</span>
+<span class="sd">        (42, 3)</span>
+<span class="sd">        &gt;&gt;&gt; result = job.run()</span>
+<span class="sd">        Args: a=42, b=True, c=&#39;foo&#39;</span>
+<span class="sd">        &gt;&gt;&gt; result</span>
+<span class="sd">        &lt;multijob.job.JobResult object at 0x...&gt;</span>
+
+<span class="sd">    Example: reading a list::</span>
+
+<span class="sd">        &gt;&gt;&gt; import csv</span>
+<span class="sd">        &gt;&gt;&gt; def target():</span>
+<span class="sd">        ...     pass</span>
+<span class="sd">        &gt;&gt;&gt; def csv_line(line):</span>
+<span class="sd">        ...     return [float(x) for x in list(csv.reader([line]))[0]]</span>
+<span class="sd">        &gt;&gt;&gt; argv = [&#39;--id=3&#39;, &#39;--rep=14&#39;, &#39;--&#39;, &#39;xs=1.2,3.4,5.6&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; job = job_from_argv(argv, target, typemap=dict(xs=csv_line))</span>
+<span class="sd">        &gt;&gt;&gt; job.params[&#39;xs&#39;]</span>
+<span class="sd">        [1.2, 3.4, 5.6]</span>
+
+<span class="sd">    Example: customizing job format</span>
+
+<span class="sd">        &gt;&gt;&gt; def target():</span>
+<span class="sd">        ...     pass</span>
+<span class="sd">        &gt;&gt;&gt; conf = JobArgvConfig(</span>
+<span class="sd">        ...     job_id_key=&#39;--job-id&#39;,</span>
+<span class="sd">        ...     repetition_id_key=&#39;--iteration&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; argv = [&#39;--job-id=15&#39;, &#39;--iteration=2&#39;, &#39;--&#39;, &#39;a=foo&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; job = job_from_argv(argv, target,</span>
+<span class="sd">        ...                     typemap=dict(a=str),</span>
+<span class="sd">        ...                     job_argv_config=conf)</span>
+<span class="sd">        &gt;&gt;&gt; (job.job_id, job.repetition_id, job.params)</span>
+<span class="sd">        (15, 2, {&#39;a&#39;: &#39;foo&#39;})</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">job_argv_config</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">job_argv_config</span> <span class="o">=</span> <span class="n">DEFAULT_JOB_ARGV_CONFIG</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">separator_ix</span> <span class="o">=</span> <span class="n">argv</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;--&#39;</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;no argument separator &#39;--&#39; found&quot;</span><span class="p">)</span>
+
+    <span class="n">meta_args</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[:</span><span class="n">separator_ix</span><span class="p">]</span>
+    <span class="n">param_args</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="n">separator_ix</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]</span>
+
+    <span class="n">raw_meta</span> <span class="o">=</span> <span class="n">UnparsedArguments</span><span class="o">.</span><span class="n">from_argv</span><span class="p">(</span><span class="n">meta_args</span><span class="p">)</span>
+
+    <span class="n">job_id</span> <span class="o">=</span> <span class="n">raw_meta</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">job_argv_config</span><span class="o">.</span><span class="n">job_id_key</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+    <span class="n">repetition_id</span> <span class="o">=</span> <span class="n">raw_meta</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">job_argv_config</span><span class="o">.</span><span class="n">repetition_id_key</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">raw_meta</span><span class="p">:</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">raw_meta</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;unexpected meta args: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">keys</span><span class="p">)))</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="n">_dict_from_argv</span><span class="p">(</span><span class="n">param_args</span><span class="p">,</span>
+                             <span class="n">typemap</span><span class="o">=</span><span class="n">typemap</span><span class="p">,</span>
+                             <span class="n">default_coercion</span><span class="o">=</span><span class="n">default_coercion</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">multijob</span><span class="o">.</span><span class="n">job</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">repetition_id</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="shell_command_from_job"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.shell_command_from_job">[docs]</a><span class="k">def</span> <span class="nf">shell_command_from_job</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">job</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span>
+                           <span class="n">typemap</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">default_coercion</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">job_argv_config</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Turn a job into a shell command.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        prefix (str):</span>
+<span class="sd">            The command to be invoked.</span>
+<span class="sd">            This is a shell script snippet and **will not be escaped**!</span>
+<span class="sd">            You are responsible for preventing shell-injection.</span>
+<span class="sd">        job (multijob.job.Job):</span>
+<span class="sd">            The job to be encoded.</span>
+<span class="sd">        typemap (Typemap):</span>
+<span class="sd">            Optional. See :func:`argv_from_job`.</span>
+<span class="sd">        default_coercion (Coercion):</span>
+<span class="sd">            Optional. See :func:`argv_from_job`.</span>
+<span class="sd">        job_argv_config (JobArgvConfig):</span>
+<span class="sd">            Optional. See :func:`argv_from_job`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The job as a shell command.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; job = multijob.job.Job(40, 2, lambda x: x, dict(y=&#39;foo bar&#39;))</span>
+<span class="sd">        &gt;&gt;&gt; print(shell_command_from_job(&#39;$RUN_GA&#39;, job))</span>
+<span class="sd">        $RUN_GA --id=40 --rep=2 -- &#39;y=foo bar&#39;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">job_argv</span> <span class="o">=</span> <span class="n">argv_from_job</span><span class="p">(</span>
+        <span class="n">job</span><span class="p">,</span>
+        <span class="n">typemap</span><span class="o">=</span><span class="n">typemap</span><span class="p">,</span>
+        <span class="n">default_coercion</span><span class="o">=</span><span class="n">default_coercion</span><span class="p">,</span>
+        <span class="n">job_argv_config</span><span class="o">=</span><span class="n">job_argv_config</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">shell_word_from_string</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">job_argv</span><span class="p">)</span></div>
+
+<span class="n">SAFE_SHELL_WORDS_RE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;\A[-+a-zA-Z0-9_=!./]+\Z&#39;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="shell_word_from_string"><a class="viewcode-back" href="../../api/multijob.commandline.html#multijob.commandline.shell_word_from_string">[docs]</a><span class="k">def</span> <span class="nf">shell_word_from_string</span><span class="p">(</span><span class="n">word</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Escape arguments for POSIX shells.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        word (str): The word to escape.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The safely escaped word.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        &gt;&gt;&gt; print(shell_word_from_string(&quot;&quot;))</span>
+<span class="sd">        &#39;&#39;</span>
+<span class="sd">        &gt;&gt;&gt; print(shell_word_from_string(&quot;foo&quot;))</span>
+<span class="sd">        foo</span>
+<span class="sd">        &gt;&gt;&gt; print(shell_word_from_string(&quot;foo bar&quot;))</span>
+<span class="sd">        &#39;foo bar&#39;</span>
+<span class="sd">        &gt;&gt;&gt; print(shell_word_from_string(&quot;foo&#39;bar&#39;baz&quot;))</span>
+<span class="sd">        &#39;foo&#39;\&#39;&#39;bar&#39;\&#39;&#39;baz&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Posix says:</span>
+    <span class="c1">#</span>
+    <span class="c1"># The application shall quote the following characters if they are to</span>
+    <span class="c1"># represent themselves:</span>
+    <span class="c1">#</span>
+    <span class="c1">#   |  &amp;  ;  &lt;  &gt;  (  )  $  `  \  &quot;  &#39;  &lt;space&gt;  &lt;tab&gt;  &lt;newline&gt;</span>
+    <span class="c1">#</span>
+    <span class="c1">#   and the following may need to be quoted under certain circumstances.</span>
+    <span class="c1">#   That is, these characters may be special depending on conditions</span>
+    <span class="c1">#   described elsewhere in this volume of POSIX.1-2008:</span>
+    <span class="c1">#</span>
+    <span class="c1">#   *   ?   [   #   ~   =   %</span>
+    <span class="c1">#</span>
+    <span class="c1"># http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html</span>
+    <span class="c1">#</span>
+    <span class="c1"># For command arguments the &quot;=&quot; does not need to be quoted.</span>
+    <span class="c1"># That leaves us with a couple of safe characters,</span>
+    <span class="c1"># see SAFE_SHELL_WORDS_RE</span>
+    <span class="c1">#</span>
+    <span class="c1"># All other words will be quoted.</span>
+    <span class="c1">#</span>
+    <span class="c1"># See also: http://stackoverflow.com/q/35817/1521179</span>
+
+    <span class="k">if</span> <span class="n">word</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;&#39;&#39;&quot;</span>
+    <span class="k">if</span> <span class="n">SAFE_SHELL_WORDS_RE</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">word</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">word</span>
+    <span class="k">return</span> <span class="s2">&quot;&#39;&quot;</span> <span class="o">+</span> <span class="n">word</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;&#39;\&#39;&#39;&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;&#39;&quot;</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Multijob</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/multijob.html">multijob package</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../parallelTutorial.html">From scripts to GNU Parallel</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, the Multijob authors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

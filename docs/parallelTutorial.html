@@ -1,0 +1,251 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>From scripts to GNU Parallel &#8212; Multijob 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="multijob.job module" href="api/multijob.job.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="from-scripts-to-gnu-parallel">
+<h1>From scripts to GNU Parallel<a class="headerlink" href="#from-scripts-to-gnu-parallel" title="Permalink to this headline">¶</a></h1>
+<p>This tutorial describes in more detail how you can run jobs with GNU Parallel by using the <a class="reference internal" href="api/multijob.commandline.html#module-multijob.commandline" title="multijob.commandline"><code class="xref py py-mod docutils literal"><span class="pre">multijob.commandline</span></code></a> module.</p>
+<p>Prerequisites:</p>
+<ul class="simple">
+<li>You can generate job configurations with <a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder" title="multijob.job.JobBuilder"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.JobBuilder</span></code></a>.</li>
+<li>You can run <a class="reference internal" href="api/multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">Job</span></code></a>s and can deal with <a class="reference internal" href="api/multijob.job.html#multijob.job.JobResult" title="multijob.job.JobResult"><code class="xref py py-class docutils literal"><span class="pre">JobResult</span></code></a>s.</li>
+<li>You are comfortable with the Linux shell.</li>
+</ul>
+<div class="section" id="concepts-and-architecture">
+<h2>Concepts and Architecture<a class="headerlink" href="#concepts-and-architecture" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="api/multijob.html#module-multijob" title="multijob"><code class="xref py py-mod docutils literal"><span class="pre">multijob</span></code></a> module is intended to support
+easy parallelization of computation-intensive jobs,
+for example: evolutionary algorithms.
+We assume all jobs are the same
+but are executed with different parameter values.</p>
+<p>For the purpose of this tutorial, we will assume the EA is written in Python.
+However, the command line interface is language-agnostic and can also be adapted for other languages.</p>
+<p>The central part of your work is the executable that performs the job.
+I&#8217;ll call it <code class="docutils literal"><span class="pre">runGA.py</span></code>.
+This executable will be invoked with the job parameters as command line parameters.
+The command line parameters are represented in our code as <a class="reference internal" href="api/multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.Job</span></code></a> objects.</p>
+<p>The general workflow is:</p>
+<ol class="arabic simple">
+<li>Generate a list of job configurations with the <a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder" title="multijob.job.JobBuilder"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.JobBuilder</span></code></a>.</li>
+<li>Turn the list into a shell script with <code class="xref py py-func docutils literal"><span class="pre">multijob.command.shell_command_from_job()</span></code>.
+This shell script can be seen as a job queue.</li>
+<li>Process the job queue with GNU Parallel.
+This will invoke the <code class="docutils literal"><span class="pre">runGA.py</span></code> program.
+The actual target program may be run locally, or on a remote server.</li>
+<li>In the <code class="docutils literal"><span class="pre">runGA.py</span></code>, decode the command line arguments back to a Job instance.</li>
+<li>In the <code class="docutils literal"><span class="pre">runGA.py</span></code>, execute the Job</li>
+<li>In the <code class="docutils literal"><span class="pre">runGA.py</span></code>, write the results to output files.</li>
+<li>Aggregate and analyze your results.</li>
+</ol>
+</div>
+<div class="section" id="typemaps-and-coercions">
+<h2>Typemaps and Coercions<a class="headerlink" href="#typemaps-and-coercions" title="Permalink to this headline">¶</a></h2>
+<p>To convert between <a class="reference internal" href="api/multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.Job</span></code></a> instances and command line parameters, we need to <em>coerce</em> each parameter value.
+A <a class="reference internal" href="api/multijob.commandline.html#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><code class="xref py py-class docutils literal"><span class="pre">Coercion</span></code></a> is a function that specifies how this is done.
+A mapping between parameter names and the coercions that should be used for these parameters is a <em>typemap</em>.</p>
+<p>When converting a job to the command line params, by default we convert each parameter with <code class="docutils literal"><span class="pre">str()</span></code>.
+This works fine for strings, numbers, booleans, etc.:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">JobBuilder</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">shell_command_from_job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">dummy_target</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">JobBuilder</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="s1">&#39;foo&#39;</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">42.3</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">dummy_target</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;runGA.py&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">))</span>
+<span class="go">runGA.py --id=0 --rep=0 -- x=foo y=42.3 z=False</span>
+</pre></div>
+</div>
+<p>If you want to pass special types that do not have a suitable string representation, you may have to write your own coercion.
+E.g. if you want to pass a list of values for a parameter, we might want to encode it as CSV.
+Note that we now declare a <code class="docutils literal"><span class="pre">TYPEMAP</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">csv</span><span class="o">,</span> <span class="nn">io</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">JobBuilder</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">shell_command_from_job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">dummy_target</span><span class="p">(</span><span class="n">xs</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">as_csv_line</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\r\n</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">TYPEMAP</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">xs</span><span class="o">=</span><span class="n">as_csv_line</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">JobBuilder</span><span class="p">(</span><span class="n">xs</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;Bond, James&#39;</span><span class="p">,</span> <span class="s1">&#39;007&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">dummy_target</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;runGA.py&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="n">TYPEMAP</span><span class="p">))</span>
+<span class="go">runGA.py --id=0 --rep=0 -- &#39;xs=&quot;Bond, James&quot;,007&#39;</span>
+</pre></div>
+</div>
+<p>This typemap just says:
+“for the <code class="docutils literal"><span class="pre">xs</span></code> parameter, use the <code class="docutils literal"><span class="pre">as_csv_line()</span></code> function.”</p>
+<p>On the other end, we have to turn the command line parameters back to into a Job instance.
+This is usually a bit more difficult.
+In particular, we will almost always need a typemap.
+The coercions now specify how to turn the string back into a Python object.
+For simple built-in types like strings, ints, floats, and bools, you can use the type name as a string in place of a coercion – a <em>named coercion</em>.
+See the <a class="reference internal" href="api/multijob.commandline.html#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><code class="xref py py-class docutils literal"><span class="pre">Coercion</span></code></a> docs for details.</p>
+<p>In Python, the command line parameters can be read from the <code class="docutils literal"><span class="pre">sys.argv</span></code> list.
+The first item is the name of the current command and has to be skipped.
+Multijob provides the <code class="xref py py-func docutils literal"><span class="pre">multi.commandline.job_from_argv()</span></code> function for the conversion:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">job_from_argv</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">my_algorithm</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="o">...</span>  <span class="c1"># you probably have something more interesting here</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">y</span> <span class="k">if</span> <span class="n">z</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">TYPEMAP</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">x</span><span class="o">=</span><span class="s1">&#39;str&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">y</span><span class="o">=</span><span class="s1">&#39;float&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">z</span><span class="o">=</span><span class="s1">&#39;bool&#39;</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># argv = sys.argv</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;runGA.py&#39;</span><span class="p">,</span> <span class="s1">&#39;--id=0&#39;</span><span class="p">,</span> <span class="s1">&#39;--rep=0&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s1">&#39;x=foo&#39;</span><span class="p">,</span> <span class="s1">&#39;y=42.3&#39;</span><span class="p">,</span> <span class="s1">&#39;z=False&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># remember to skip first argv entry</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">my_algorithm</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="n">TYPEMAP</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># execute the job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">res</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">res</span><span class="o">.</span><span class="n">result</span>
+<span class="go">3</span>
+</pre></div>
+</div>
+<p>Instead of using the predefined named coercions, you can always provide your own functions.</p>
+</div>
+<div class="section" id="converting-a-runga-function-to-a-runga-py-script">
+<h2>Converting a <code class="docutils literal"><span class="pre">runGA()</span></code> function to a <code class="docutils literal"><span class="pre">runGA.py</span></code> script<a class="headerlink" href="#converting-a-runga-function-to-a-runga-py-script" title="Permalink to this headline">¶</a></h2>
+<p>TODO</p>
+</div>
+<div class="section" id="creating-the-jobs">
+<h2>Creating the jobs<a class="headerlink" href="#creating-the-jobs" title="Permalink to this headline">¶</a></h2>
+<p>TODO</p>
+</div>
+<div class="section" id="turning-jobs-into-shell-commands">
+<h2>Turning jobs into shell commands<a class="headerlink" href="#turning-jobs-into-shell-commands" title="Permalink to this headline">¶</a></h2>
+<p>TODO</p>
+</div>
+<div class="section" id="executing-jobs-with-parallel">
+<h2>Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-with-parallel" title="Permalink to this headline">¶</a></h2>
+<p>TODO</p>
+</div>
+<div class="section" id="suggested-workflow-and-conventions">
+<h2>Suggested workflow and conventions<a class="headerlink" href="#suggested-workflow-and-conventions" title="Permalink to this headline">¶</a></h2>
+<p>TODO</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Multijob</a></h1>
+
+
+
+
+
+
+
+
+
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">From scripts to GNU Parallel</a><ul>
+<li><a class="reference internal" href="#concepts-and-architecture">Concepts and Architecture</a></li>
+<li><a class="reference internal" href="#typemaps-and-coercions">Typemaps and Coercions</a></li>
+<li><a class="reference internal" href="#converting-a-runga-function-to-a-runga-py-script">Converting a <code class="docutils literal"><span class="pre">runGA()</span></code> function to a <code class="docutils literal"><span class="pre">runGA.py</span></code> script</a></li>
+<li><a class="reference internal" href="#creating-the-jobs">Creating the jobs</a></li>
+<li><a class="reference internal" href="#turning-jobs-into-shell-commands">Turning jobs into shell commands</a></li>
+<li><a class="reference internal" href="#executing-jobs-with-parallel">Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
+<li><a class="reference internal" href="#suggested-workflow-and-conventions">Suggested workflow and conventions</a></li>
+</ul>
+</li>
+</ul>
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/multijob.html">multijob package</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">From scripts to GNU Parallel</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api/multijob.job.html" title="previous chapter">multijob.job module</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, the Multijob authors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/parallelTutorial.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

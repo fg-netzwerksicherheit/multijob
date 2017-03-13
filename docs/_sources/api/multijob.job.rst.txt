@@ -1,0 +1,6 @@
+multijob.job module
+===================
+
+.. automodule:: multijob.job
+    :members:
+    :show-inheritance:

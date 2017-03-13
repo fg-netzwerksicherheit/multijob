@@ -1,0 +1,566 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>multijob.commandline module &#8212; Multijob 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="multijob.job module" href="multijob.job.html" />
+    <link rel="prev" title="multijob package" href="multijob.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-multijob.commandline">
+<span id="multijob-commandline-module"></span><h1>multijob.commandline module<a class="headerlink" href="#module-multijob.commandline" title="Permalink to this headline">¶</a></h1>
+<p>Turn job objects into command line arguments and back again.</p>
+<p>The usage of these functions is explained in more detail in the
+<a class="reference internal" href="../parallelTutorial.html"><span class="doc">From scripts to GNU Parallel</span></a> tutorial.</p>
+<p>You should use <a class="reference internal" href="#multijob.commandline.job_from_argv" title="multijob.commandline.job_from_argv"><code class="xref py py-func docutils literal"><span class="pre">job_from_argv()</span></code></a> and <a class="reference internal" href="#multijob.commandline.argv_from_job" title="multijob.commandline.argv_from_job"><code class="xref py py-func docutils literal"><span class="pre">argv_from_job()</span></code></a> to convert
+between <a class="reference internal" href="multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.Job</span></code></a> instances and command line parameters.  These
+functions use <em>typemaps</em> and <em>coercions</em>.</p>
+<p>A typemap is a dictionary that maps named params to a specific coercion.</p>
+<p>A coercion is a function that turns a string into a Python data type or back
+(see <a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><code class="xref py py-class docutils literal"><span class="pre">Coercion</span></code></a>).</p>
+<p>If you need to take more control over parsing, you can get convenient
+random-access to the command line parameters via <a class="reference internal" href="#multijob.commandline.UnparsedArguments" title="multijob.commandline.UnparsedArguments"><code class="xref py py-class docutils literal"><span class="pre">UnparsedArguments</span></code></a>, or
+can apply a particular coercion to a string value via
+<a class="reference internal" href="#multijob.commandline.value_from_string" title="multijob.commandline.value_from_string"><code class="xref py py-func docutils literal"><span class="pre">value_from_string()</span></code></a>.</p>
+<p>To turn a job into a shell command, use <a class="reference internal" href="#multijob.commandline.shell_command_from_job" title="multijob.commandline.shell_command_from_job"><code class="xref py py-func docutils literal"><span class="pre">shell_command_from_job()</span></code></a>.
+This uses the <a class="reference internal" href="#multijob.commandline.shell_word_from_string" title="multijob.commandline.shell_word_from_string"><code class="xref py py-func docutils literal"><span class="pre">shell_word_from_string()</span></code></a> function for escaping.</p>
+<p>Example: Turning a list of job objects into a command line script:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">JobBuilder</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">dummy</span><span class="p">():</span> <span class="k">pass</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># create the jobs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span> <span class="o">=</span> <span class="n">JobBuilder</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;a&#39;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">_</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">add_linspace</span><span class="p">(</span><span class="s1">&#39;b&#39;</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">jobs</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">dummy</span><span class="p">,</span> <span class="n">repetitions</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># print the jobs</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">jobs</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;./run-jobs&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">))</span>
+<span class="go">./run-jobs --id=0 --rep=0 -- a=2 b=1.0</span>
+<span class="go">./run-jobs --id=1 --rep=0 -- a=2 b=2.0</span>
+<span class="go">./run-jobs --id=2 --rep=0 -- a=2 b=3.0</span>
+</pre></div>
+</div>
+<p>Example: Decoding arguments inside a script:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># define a worker function and a typemap for it</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">TYPEMAP</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s1">&#39;float&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">worker</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># argv = sys.argv</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;./run-jobs&#39;</span><span class="p">,</span> <span class="s1">&#39;--id=2&#39;</span><span class="p">,</span> <span class="s1">&#39;--rep=0&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="s1">&#39;a=2&#39;</span><span class="p">,</span> <span class="s1">&#39;b=3.0&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># skip the first argument</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># decode the job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">worker</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="n">TYPEMAP</span><span class="p">)</span>
+<span class="go">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># run the job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span><span class="o">.</span><span class="n">result</span>
+<span class="go">6.0</span>
+</pre></div>
+</div>
+<dl class="class">
+<dt id="multijob.commandline.Coercion">
+<em class="property">class </em><code class="descclassname">multijob.commandline.</code><code class="descname">Coercion</code><span class="sig-paren">(</span><em>_private</em>, <em>_parser</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#Coercion"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.Coercion" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/2/library/functions.html#object" title="(in Python v2.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<p>Coercion from command line args to Python objects.</p>
+<p>Coercions describe how command line arguments are converted to Python data
+types. This concept is used throughout the module documentation.</p>
+<p>Coercions are functions that take a single parameter (the string to be
+coerced) and return a single Python object. Coercions may also be <em>named</em>.
+Instead of supplying a callback, the coercion may be one of:</p>
+<ul class="simple">
+<li><code class="docutils literal"><span class="pre">'str'</span></code></li>
+<li><code class="docutils literal"><span class="pre">'int'</span></code></li>
+<li><code class="docutils literal"><span class="pre">'float'</span></code></li>
+<li><code class="docutils literal"><span class="pre">'bool'</span></code></li>
+</ul>
+<p>Example: coercion function:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)(</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="s1">&#39;42&#39;</span><span class="p">)</span>
+<span class="go">42</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;y&#39;</span><span class="p">)(</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="s1">&#39;42&#39;</span><span class="p">)</span>
+<span class="go">&#39;42&#39;</span>
+</pre></div>
+</div>
+<p>Example: named coercion:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="s1">&#39;bool&#39;</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;p&#39;</span><span class="p">)(</span><span class="s1">&#39;p&#39;</span><span class="p">,</span> <span class="s1">&#39;False&#39;</span><span class="p">)</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="s1">&#39;float&#39;</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;f&#39;</span><span class="p">)(</span><span class="s1">&#39;f&#39;</span><span class="p">,</span> <span class="s1">&#39;4.2&#39;</span><span class="p">)</span>
+<span class="go">4.2</span>
+</pre></div>
+</div>
+<p>Example: coercions are coercions:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">a</span> <span class="o">=</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;y&#39;</span><span class="p">)</span>
+<span class="go">&lt;multijob.commandline.Coercion object at 0x...&gt;</span>
+</pre></div>
+</div>
+<p>Example: coercion must be callable:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;blorp&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="gr">TypeError</span>: <span class="n">&#39;blorp&#39; coercion must be callable: 42</span>
+</pre></div>
+</div>
+<p>Example: explains error when coercion fails:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">bad_coercion</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;nope&quot;</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coercion</span> <span class="o">=</span> <span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">bad_coercion</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coercion</span><span class="p">(</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="s1">&#39;42&#39;</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="gr">ValueError</span>: <span class="n">Could not coerce &#39;x&#39;=&#39;42&#39;:</span>
+<span class="go">nope</span>
+</pre></div>
+</div>
+<p>Example: propagates Nones:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Coercion</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">paramname</span><span class="o">=</span><span class="s1">&#39;x&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<dl class="staticmethod">
+<dt id="multijob.commandline.Coercion.of">
+<em class="property">static </em><code class="descname">of</code><span class="sig-paren">(</span><em>name_or_callable</em>, <em>*</em>, <em>paramname</em>, <em>named_coercions=_Default</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#Coercion.of"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.Coercion.of" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create/check a coercion.</p>
+<p>Calling this functions turns a callable or named coercion into a proper
+coercion object with suitable error handling.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name_or_callable</strong> (<em>str|Callable|Coercion</em>) &#8211; The coercion.</li>
+<li><strong>paramname</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The name of the parameter which we&#8217;re going to coerce.
+This is only used for error messages.</li>
+<li><strong>named_coercions</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; Optional. Available named coercions.
+Defaults to <code class="docutils literal"><span class="pre">Coercion.NAMED_COERCIONS</span></code>.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">A coercion object with suitable error handling.
+Returns <em>None</em> if <em>name_or_callable</em> was <em>None</em>.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion">Coercion</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="multijob.commandline.JobArgvConfig">
+<em class="property">class </em><code class="descclassname">multijob.commandline.</code><code class="descname">JobArgvConfig</code><span class="sig-paren">(</span><em>*</em>, <em>job_id_key</em>, <em>repetition_id_key</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#JobArgvConfig"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.JobArgvConfig" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/2/library/functions.html#object" title="(in Python v2.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<p>Specify how job parameters are encoded.</p>
+<dl class="attribute">
+<dt id="multijob.commandline.JobArgvConfig.job_id_key">
+<code class="descname">job_id_key</code><a class="headerlink" href="#multijob.commandline.JobArgvConfig.job_id_key" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>str</em> &#8211; Name of the <code class="docutils literal"><span class="pre">job_id</span></code> attribute.</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="multijob.commandline.JobArgvConfig.repetition_id_key">
+<code class="descname">repetition_id_key</code><a class="headerlink" href="#multijob.commandline.JobArgvConfig.repetition_id_key" title="Permalink to this definition">¶</a></dt>
+<dd><p><em>str</em> &#8211; Name of the <code class="docutils literal"><span class="pre">repetition_id</span></code> attribute.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="multijob.commandline.UnparsedArguments">
+<em class="property">class </em><code class="descclassname">multijob.commandline.</code><code class="descname">UnparsedArguments</code><span class="sig-paren">(</span><em>args</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#UnparsedArguments"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.UnparsedArguments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/2/library/functions.html#object" title="(in Python v2.7)"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a></p>
+<p>A collection of unnamed arguments.</p>
+<p>This may be useful if you have to do some parsing manually.</p>
+<p>Use <a class="reference internal" href="#multijob.commandline.UnparsedArguments.from_argv" title="multijob.commandline.UnparsedArguments.from_argv"><code class="xref py py-meth docutils literal"><span class="pre">from_argv()</span></code></a> to construct this object from an argv array.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>args</strong> (<a class="reference external" href="https://docs.python.org/2/library/stdtypes.html#dict" title="(in Python v2.7)"><em>dict</em></a>) &#8211; the name-value command line parameters.</td>
+</tr>
+</tbody>
+</table>
+<dl class="staticmethod">
+<dt id="multijob.commandline.UnparsedArguments.from_argv">
+<em class="property">static </em><code class="descname">from_argv</code><span class="sig-paren">(</span><em>argv</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#UnparsedArguments.from_argv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.UnparsedArguments.from_argv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create UnparsedArguments from an argv array.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="multijob.commandline.UnparsedArguments.read">
+<code class="descname">read</code><span class="sig-paren">(</span><em>name</em>, <em>coercion</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#UnparsedArguments.read"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.UnparsedArguments.read" title="Permalink to this definition">¶</a></dt>
+<dd><p>Consume and coerce a named argument.</p>
+<p>Since the argument is consumed, it cannot be consumed again.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The name of the argument to consume.</li>
+<li><strong>coercion</strong> (<a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><em>Coercion</em></a>) &#8211; The coercion to apply to this value.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">the coerced value.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
+<li><code class="xref py py-exc docutils literal"><span class="pre">KeyError</span></code> &#8211; when no such argument name exists.</li>
+<li><code class="xref py py-exc docutils literal"><span class="pre">ValueError</span></code> &#8211; when the value can&#8217;t be coerced.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="multijob.commandline.argv_from_job">
+<code class="descclassname">multijob.commandline.</code><code class="descname">argv_from_job</code><span class="sig-paren">(</span><em>job</em>, <em>*</em>, <em>typemap=None</em>, <em>default_coercion=None</em>, <em>job_argv_config=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#argv_from_job"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.argv_from_job" title="Permalink to this definition">¶</a></dt>
+<dd><p>Format a job as command line arguments.</p>
+<p>To get a job object back from these arguments,
+use <a class="reference internal" href="#multijob.commandline.job_from_argv" title="multijob.commandline.job_from_argv"><code class="xref py py-func docutils literal"><span class="pre">job_from_argv()</span></code></a>.</p>
+<p>The <code class="docutils literal"><span class="pre">job.callback</span></code> will not be stored
+and will have to be provided explicitly when parsing the arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>job</strong> (<a class="reference internal" href="multijob.job.html#module-multijob.job" title="multijob.job"><em>multijob.job</em></a>) &#8211; The job to format.</li>
+<li><strong>typemap</strong> (<em>Typemap</em>) &#8211; Optional. Controls how individual params are formatted.</li>
+<li><strong>default_coercion</strong> (<a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><em>Coercion</em></a>) &#8211; Optional. Controls how params without a typemap entry are formatted.</li>
+<li><strong>job_argv_config</strong> (<a class="reference internal" href="#multijob.commandline.JobArgvConfig" title="multijob.commandline.JobArgvConfig"><em>JobArgvConfig</em></a>) &#8211; Optional. Controls names of job attributes.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The encoded params.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/2/library/functions.html#list" title="(in Python v2.7)">list</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Example: simple usage:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">Job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">target</span><span class="p">():</span> <span class="k">pass</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="mi">42</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;foo&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv_from_job</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+<span class="go">[&#39;--id=42&#39;, &#39;--rep=3&#39;, &#39;--&#39;, &#39;a=42&#39;, &#39;b=True&#39;, &#39;c=foo&#39;]</span>
+</pre></div>
+</div>
+<p>Example: storing a list:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">Job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">csv</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">io</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">csv_line</span><span class="p">(</span><span class="n">items</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">out</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="n">out</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\r\n</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">target</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">xs</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv_from_job</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">xs</span><span class="o">=</span><span class="n">csv_line</span><span class="p">))</span>
+<span class="go">[..., &#39;--&#39;, &#39;xs=1,2,3&#39;]</span>
+</pre></div>
+</div>
+<p>Example: customizing job format:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">Job</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">conf</span> <span class="o">=</span> <span class="n">JobArgvConfig</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">job_id_key</span><span class="o">=</span><span class="s1">&#39;--job-id&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">repetition_id_key</span><span class="o">=</span><span class="s1">&#39;--nexecs&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s1">&#39;b&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv_from_job</span><span class="p">(</span><span class="n">job</span><span class="p">,</span> <span class="n">job_argv_config</span><span class="o">=</span><span class="n">conf</span><span class="p">)</span>
+<span class="go">[&#39;--job-id=2&#39;, &#39;--nexecs=7&#39;, &#39;--&#39;, &#39;a=b&#39;]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="multijob.commandline.job_from_argv">
+<code class="descclassname">multijob.commandline.</code><code class="descname">job_from_argv</code><span class="sig-paren">(</span><em>argv</em>, <em>callback</em>, <em>*</em>, <em>typemap</em>, <em>default_coercion=None</em>, <em>job_argv_config=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#job_from_argv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.job_from_argv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse command line arguments into a job object.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>argv</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#list" title="(in Python v2.7)"><em>list</em></a>) &#8211; The arguments.</li>
+<li><strong>callback</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#callable" title="(in Python v2.7)"><em>callable</em></a>) &#8211; A function to invoke with the params,
+see <a class="reference internal" href="multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.Job</span></code></a> for details.</li>
+<li><strong>typemap</strong> (<em>Typemap</em>) &#8211; Controls how individual params are parsed.</li>
+<li><strong>default_coercion</strong> (<a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><em>Coercion</em></a>) &#8211; Optional. Controls how params without a typemap entry are formatted.</li>
+<li><strong>job_argv_config</strong> (<a class="reference internal" href="#multijob.commandline.JobArgvConfig" title="multijob.commandline.JobArgvConfig"><em>JobArgvConfig</em></a>) &#8211; Optional. Controls names of job attributes.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">a runnable job with the params from this argv.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference internal" href="multijob.job.html#multijob.job.Job" title="multijob.job.Job">multijob.job.Job</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Example: simple usage:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">target</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Args: a=</span><span class="si">{!r}</span><span class="s2">, b=</span><span class="si">{!r}</span><span class="s2">, c=</span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">))</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="s2">&quot;some value&quot;</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--id=42&#39;</span><span class="p">,</span> <span class="s1">&#39;--rep=3&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="s1">&#39;a=42&#39;</span><span class="p">,</span> <span class="s1">&#39;b=True&#39;</span><span class="p">,</span> <span class="s1">&#39;c=foo&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">TYPEMAP</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="s1">&#39;bool&#39;</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="s1">&#39;str&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="n">TYPEMAP</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">repetition_id</span><span class="p">)</span>
+<span class="go">(42, 3)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="go">Args: a=42, b=True, c=&#39;foo&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span>
+<span class="go">&lt;multijob.job.JobResult object at 0x...&gt;</span>
+</pre></div>
+</div>
+<p>Example: reading a list:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">csv</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">target</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">csv_line</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">return</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">reader</span><span class="p">([</span><span class="n">line</span><span class="p">]))[</span><span class="mi">0</span><span class="p">]]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--id=3&#39;</span><span class="p">,</span> <span class="s1">&#39;--rep=14&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="s1">&#39;xs=1.2,3.4,5.6&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">typemap</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">xs</span><span class="o">=</span><span class="n">csv_line</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s1">&#39;xs&#39;</span><span class="p">]</span>
+<span class="go">[1.2, 3.4, 5.6]</span>
+</pre></div>
+</div>
+<p>Example: customizing job format</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">target</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="k">pass</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">conf</span> <span class="o">=</span> <span class="n">JobArgvConfig</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">job_id_key</span><span class="o">=</span><span class="s1">&#39;--job-id&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">repetition_id_key</span><span class="o">=</span><span class="s1">&#39;--iteration&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">argv</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--job-id=15&#39;</span><span class="p">,</span> <span class="s1">&#39;--iteration=2&#39;</span><span class="p">,</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="s1">&#39;a=foo&#39;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">job_from_argv</span><span class="p">(</span><span class="n">argv</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span>
+<span class="gp">... </span>                    <span class="n">typemap</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">a</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span>
+<span class="gp">... </span>                    <span class="n">job_argv_config</span><span class="o">=</span><span class="n">conf</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">repetition_id</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
+<span class="go">(15, 2, {&#39;a&#39;: &#39;foo&#39;})</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="multijob.commandline.shell_command_from_job">
+<code class="descclassname">multijob.commandline.</code><code class="descname">shell_command_from_job</code><span class="sig-paren">(</span><em>prefix</em>, <em>job</em>, <em>*</em>, <em>typemap=None</em>, <em>default_coercion=None</em>, <em>job_argv_config=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#shell_command_from_job"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.shell_command_from_job" title="Permalink to this definition">¶</a></dt>
+<dd><p>Turn a job into a shell command.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>prefix</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The command to be invoked.
+This is a shell script snippet and <strong>will not be escaped</strong>!
+You are responsible for preventing shell-injection.</li>
+<li><strong>job</strong> (<a class="reference internal" href="multijob.job.html#multijob.job.Job" title="multijob.job.Job"><em>multijob.job.Job</em></a>) &#8211; The job to be encoded.</li>
+<li><strong>typemap</strong> (<em>Typemap</em>) &#8211; Optional. See <a class="reference internal" href="#multijob.commandline.argv_from_job" title="multijob.commandline.argv_from_job"><code class="xref py py-func docutils literal"><span class="pre">argv_from_job()</span></code></a>.</li>
+<li><strong>default_coercion</strong> (<a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><em>Coercion</em></a>) &#8211; Optional. See <a class="reference internal" href="#multijob.commandline.argv_from_job" title="multijob.commandline.argv_from_job"><code class="xref py py-func docutils literal"><span class="pre">argv_from_job()</span></code></a>.</li>
+<li><strong>job_argv_config</strong> (<a class="reference internal" href="#multijob.commandline.JobArgvConfig" title="multijob.commandline.JobArgvConfig"><em>JobArgvConfig</em></a>) &#8211; Optional. See <a class="reference internal" href="#multijob.commandline.argv_from_job" title="multijob.commandline.argv_from_job"><code class="xref py py-func docutils literal"><span class="pre">argv_from_job()</span></code></a>.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">The job as a shell command.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last"><a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)">str</a></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">job</span> <span class="o">=</span> <span class="n">multijob</span><span class="o">.</span><span class="n">job</span><span class="o">.</span><span class="n">Job</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="s1">&#39;foo bar&#39;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;$RUN_GA&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">))</span>
+<span class="go">$RUN_GA --id=40 --rep=2 -- &#39;y=foo bar&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="multijob.commandline.shell_word_from_string">
+<code class="descclassname">multijob.commandline.</code><code class="descname">shell_word_from_string</code><span class="sig-paren">(</span><em>word</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#shell_word_from_string"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.shell_word_from_string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Escape arguments for POSIX shells.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>word</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The word to escape.</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">The safely escaped word.</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)">str</a></td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_word_from_string</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">))</span>
+<span class="go">&#39;&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_word_from_string</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">))</span>
+<span class="go">foo</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_word_from_string</span><span class="p">(</span><span class="s2">&quot;foo bar&quot;</span><span class="p">))</span>
+<span class="go">&#39;foo bar&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">shell_word_from_string</span><span class="p">(</span><span class="s2">&quot;foo&#39;bar&#39;baz&quot;</span><span class="p">))</span>
+<span class="go">&#39;foo&#39;\&#39;&#39;bar&#39;\&#39;&#39;baz&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="multijob.commandline.value_from_string">
+<code class="descclassname">multijob.commandline.</code><code class="descname">value_from_string</code><span class="sig-paren">(</span><em>name</em>, <em>value</em>, <em>coercion</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/multijob/commandline.html#value_from_string"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#multijob.commandline.value_from_string" title="Permalink to this definition">¶</a></dt>
+<dd><p>Parse a value from a string with a given coercion.</p>
+<p>This function primarily adds error handling,
+and contains support for named coercions.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>name</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The name of this argument, needed for diagnostics.</li>
+<li><strong>value</strong> (<a class="reference external" href="https://docs.python.org/2/library/functions.html#str" title="(in Python v2.7)"><em>str</em></a>) &#8211; The string to coerce.</li>
+<li><strong>coercion</strong> (<a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><em>Coercion</em></a>) &#8211; a <a class="reference internal" href="#multijob.commandline.Coercion" title="multijob.commandline.Coercion"><code class="xref py py-class docutils literal"><span class="pre">Coercion</span></code></a>. See <a class="reference internal" href="#multijob.commandline.Coercion.of" title="multijob.commandline.Coercion.of"><code class="xref py py-meth docutils literal"><span class="pre">Coercion.of()</span></code></a> for details on acceptable values.</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">the coerced value.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Example: normal usage:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">value_from_string</span><span class="p">(</span><span class="s1">&#39;x&#39;</span><span class="p">,</span> <span class="s1">&#39;42&#39;</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+<span class="go">42</span>
+</pre></div>
+</div>
+<p>Example: complains when no coercion was provided:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">value_from_string</span><span class="p">(</span><span class="s1">&#39;y&#39;</span><span class="p">,</span> <span class="s1">&#39;13&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="gt">Traceback (most recent call last):</span>
+<span class="gr">TypeError</span>: <span class="n">no coercion found for &#39;y&#39;=&#39;13&#39;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Multijob</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="multijob.html">multijob package</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="multijob.html#submodules">Submodules</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">multijob.commandline module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="multijob.job.html">multijob.job module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../parallelTutorial.html">From scripts to GNU Parallel</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="multijob.html">multijob package</a><ul>
+      <li>Previous: <a href="multijob.html" title="previous chapter">multijob package</a></li>
+      <li>Next: <a href="multijob.job.html" title="next chapter">multijob.job module</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, the Multijob authors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="../_sources/api/multijob.commandline.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

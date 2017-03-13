@@ -1,0 +1,479 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>multijob.job &#8212; Multijob 0.0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../',
+        VERSION:     '0.0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for multijob.job</h1><div class="highlight"><pre>
+<span></span><span class="c1"># coding: utf8</span>
+
+<span class="sd">&quot;&quot;&quot;Create jobs in various configurations and run them.</span>
+
+<span class="sd">The :class:`JobBuilder` class lets you build a combination of parameters easily.</span>
+<span class="sd">It produces a list of :class:`Job` instances.</span>
+<span class="sd">When running a job, you get a :class:`JobResult`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<div class="viewcode-block" id="Job"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.Job">[docs]</a><span class="k">class</span> <span class="nc">Job</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A concrete, runnable set of configuration parameters.</span>
+
+<span class="sd">    Do not create directly – use :class:`JobBuilder` instead!</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        job_id: identify this set of parameters</span>
+<span class="sd">        repetition_id: distinguish repetitions of this set of parameters</span>
+<span class="sd">        callback: function to invoke with params</span>
+<span class="sd">        params (dict): the parameters</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">repetition_id</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_id</span> <span class="o">=</span> <span class="n">job_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_repetition_id</span> <span class="o">=</span> <span class="n">repetition_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_callback</span> <span class="o">=</span> <span class="n">callback</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_params</span> <span class="o">=</span> <span class="n">params</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Identifies this set of parameters&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_id</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">repetition_id</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Distinguishes repetitions of this set of parameters.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_repetition_id</span>
+
+<div class="viewcode-block" id="Job.run"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.Job.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Execute the job.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            JobResult: the callback result, wrapped in a :class:`JobResult`.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; def add(x, y): return x + y</span>
+<span class="sd">            &gt;&gt;&gt; job = Job(1, 2, add, dict(x=2, y=40))</span>
+<span class="sd">            &gt;&gt;&gt; result = job.run()</span>
+<span class="sd">            &gt;&gt;&gt; result.job is job</span>
+<span class="sd">            True</span>
+<span class="sd">            &gt;&gt;&gt; result.result</span>
+<span class="sd">            42</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_callback</span><span class="p">(</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">JobResult</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">params</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;dict: The chosen set of parameters. Do not modify.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_params</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">job_id</span>
+        <span class="n">repetition_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">repetition_id</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span>
+
+        <span class="n">formatted_params</span> <span class="o">=</span> <span class="s1">&#39; &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">=</span><span class="si">{!r}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">params</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1">:</span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">repetition_id</span><span class="p">,</span> <span class="n">formatted_params</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="JobResult"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobResult">[docs]</a><span class="k">class</span> <span class="nc">JobResult</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;The result of a job execution.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job</span> <span class="o">=</span> <span class="n">job</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_result</span> <span class="o">=</span> <span class="n">result</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">job</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Job: The job that was run to generate this result.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">result</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Whatever the job callback returned.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_result</span></div>
+
+<span class="k">def</span> <span class="nf">_dict_list_product</span><span class="p">(</span><span class="n">dict_of_lists</span><span class="p">):</span>
+    <span class="n">lists_of_kv_pairs</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">[(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">dict_of_lists</span><span class="p">[</span><span class="n">key</span><span class="p">]]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">dict_of_lists</span><span class="o">.</span><span class="n">keys</span><span class="p">())]</span>
+
+    <span class="k">for</span> <span class="n">kv_pairs</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="n">lists_of_kv_pairs</span><span class="p">):</span>
+        <span class="k">yield</span> <span class="nb">dict</span><span class="p">(</span><span class="n">kv_pairs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="JobBuilder"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder">[docs]</a><span class="k">class</span> <span class="nc">JobBuilder</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create a range of jobs to cover the required parameter combinations</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        defaults: any default values for the parameters</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">defaults</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_param_lists</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">param</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">defaults</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_add_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">param</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_param_lists</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;redefinition of parameter </span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">param</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_param_lists</span><span class="p">[</span><span class="n">param</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="JobBuilder.add"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder.add">[docs]</a>    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="o">*</span><span class="n">values</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add a specific range of parameters.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            param: the name of the parameter</span>
+<span class="sd">            values: The values you want to add</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The added values.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;x&#39;, 1, 2, 3)</span>
+<span class="sd">            (1, 2, 3)</span>
+
+<span class="sd">        Example: Redefinition of a parameter is impossible::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;x&#39;, 1, 2, 3)</span>
+<span class="sd">            (1, 2, 3)</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;x&#39;, 4, 5, 6)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            RuntimeError: redefinition of parameter &#39;x&#39;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_list</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span></div>
+
+<div class="viewcode-block" id="JobBuilder.add_range"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder.add_range">[docs]</a>    <span class="k">def</span> <span class="nf">add_range</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">stride</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a ``[start, end]`` *inclusive* range of floats.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            param (str):</span>
+<span class="sd">                The name of the param to add.</span>
+<span class="sd">            start (float):</span>
+<span class="sd">                The start of the range.</span>
+<span class="sd">            end (float):</span>
+<span class="sd">                The inclusive end of the range. This might not be included if</span>
+<span class="sd">                ``(end - start)/stride`` is not integer.</span>
+<span class="sd">            stride (float):</span>
+<span class="sd">                The step size between numbers in the range.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The added values.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_range(&#39;x&#39;, 2, 5, 0.5)</span>
+<span class="sd">            [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; def round_all(ndigits, xs):</span>
+<span class="sd">            ...     return [round(x, ndigits) for x in xs]</span>
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; expected = round_all(7, [0/3, 1/3, 2/3, 3/3, 4/3, 5/3, 6/3])</span>
+<span class="sd">            &gt;&gt;&gt; actual = round_all(7, builder.add_range(&#39;x&#39;, 0, 2, 1/3))</span>
+<span class="sd">            &gt;&gt;&gt; actual == expected or (actual, expected)</span>
+<span class="sd">            True</span>
+
+<span class="sd">        Example: start must be smaller than end::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_range(&#39;x&#39;, 3, 0, 0.5)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            ValueError: start must be smaller than end</span>
+
+<span class="sd">        Example: stride must be positive::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_range(&#39;x&#39;, 0, 3, -0.5)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            ValueError: stride must be positive</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">start</span> <span class="o">&lt;</span> <span class="n">end</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;start must be smaller than end&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">stride</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;stride must be positive&quot;</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">_values</span><span class="p">():</span>
+            <span class="c1"># pylint: disable=invalid-name</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="n">start</span> <span class="o">+</span> <span class="n">n</span> <span class="o">*</span> <span class="n">stride</span>
+                <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="n">end</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="n">value</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_values</span><span class="p">())</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_list</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span></div>
+
+<div class="viewcode-block" id="JobBuilder.add_linspace"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder.add_linspace">[docs]</a>    <span class="k">def</span> <span class="nf">add_linspace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">param</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">num</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot; Create a ``[start, stop]`` *inclusive* range of floats.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            param (str):</span>
+<span class="sd">                The name of the param to add.</span>
+<span class="sd">            start (float):</span>
+<span class="sd">                The start of the range.</span>
+<span class="sd">            stop (float):</span>
+<span class="sd">                The inclusive stop of the range.</span>
+<span class="sd">            num (int):</span>
+<span class="sd">                The number of items in the range, must be at least 2.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The added items.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_linspace(&#39;x&#39;, 2, 5, 7)</span>
+<span class="sd">            [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; expected = [0.0, 1/3, 2/3, 1.0, 4/3, 5/3, 2.0]</span>
+<span class="sd">            &gt;&gt;&gt; actual = builder.add_linspace(&#39;x&#39;, 0, 2, 7)</span>
+<span class="sd">            &gt;&gt;&gt; actual == expected or (actual, expected)</span>
+<span class="sd">            True</span>
+
+<span class="sd">        Example: start must be smaller than stop::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_linspace(&#39;x&#39;, 3, 0, 7)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            ValueError: start must be smaller than stop</span>
+
+<span class="sd">        Example: num must be at least 2 to include start and stop:</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.add_linspace(&#39;x&#39;, 0, 3, 1)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            ValueError: num must be at least 2 to include the start and stop</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">start</span> <span class="o">&lt;</span> <span class="n">stop</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;start must be smaller than stop&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">num</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;num must be at least 2 to include the start and stop&quot;</span><span class="p">)</span>
+
+        <span class="n">span</span> <span class="o">=</span> <span class="n">stop</span> <span class="o">-</span> <span class="n">start</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">start</span> <span class="o">+</span> <span class="n">span</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">/</span> <span class="p">(</span><span class="n">num</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num</span><span class="p">)]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_list</span><span class="p">(</span><span class="n">param</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">values</span></div>
+
+<div class="viewcode-block" id="JobBuilder.number_of_jobs"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder.number_of_jobs">[docs]</a>    <span class="k">def</span> <span class="nf">number_of_jobs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Calculate the number of jobs that will be generated.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.number_of_jobs()</span>
+<span class="sd">            1</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;a&#39;, 7)</span>
+<span class="sd">            (...)</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;b&#39;, 1, 2, 3)</span>
+<span class="sd">            (...)</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;c&#39;, &#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;)</span>
+<span class="sd">            (...)</span>
+<span class="sd">            &gt;&gt;&gt; builder.number_of_jobs()</span>
+<span class="sd">            12</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">num</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_param_lists</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">num</span> <span class="o">*=</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">num</span></div>
+
+<div class="viewcode-block" id="JobBuilder.build"><a class="viewcode-back" href="../../api/multijob.job.html#multijob.job.JobBuilder.build">[docs]</a>    <span class="k">def</span> <span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">repetitions</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create all Job objects from this configuration.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            callback: The function to invoke in the Job.</span>
+<span class="sd">            repetitions: How often each parameter set should be repeated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List[Job]: All job objects.</span>
+
+<span class="sd">        Example::</span>
+
+<span class="sd">            &gt;&gt;&gt; def target(x, y, z): pass</span>
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder(x=2)</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;y&#39;, 1, 2, 3)</span>
+<span class="sd">            (...)</span>
+<span class="sd">            &gt;&gt;&gt; builder.add(&#39;z&#39;, True, False)</span>
+<span class="sd">            (...)</span>
+<span class="sd">            &gt;&gt;&gt; jobs = builder.build(target, 2)</span>
+<span class="sd">            &gt;&gt;&gt; jobs</span>
+<span class="sd">            [&lt;multijob.job.Job object at 0x...&gt;, ...]</span>
+<span class="sd">            &gt;&gt;&gt; for job in jobs:</span>
+<span class="sd">            ...     print(job)</span>
+<span class="sd">            0:0: x=2 y=1 z=True</span>
+<span class="sd">            0:1: x=2 y=1 z=True</span>
+<span class="sd">            1:0: x=2 y=1 z=False</span>
+<span class="sd">            1:1: x=2 y=1 z=False</span>
+<span class="sd">            2:0: x=2 y=2 z=True</span>
+<span class="sd">            2:1: x=2 y=2 z=True</span>
+<span class="sd">            3:0: x=2 y=2 z=False</span>
+<span class="sd">            3:1: x=2 y=2 z=False</span>
+<span class="sd">            4:0: x=2 y=3 z=True</span>
+<span class="sd">            4:1: x=2 y=3 z=True</span>
+<span class="sd">            5:0: x=2 y=3 z=False</span>
+<span class="sd">            5:1: x=2 y=3 z=False</span>
+
+<span class="sd">        Example: empty config still produces a configuration::</span>
+
+<span class="sd">            &gt;&gt;&gt; def target(): pass</span>
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.build(target, 2)</span>
+<span class="sd">            [&lt;...&gt;, &lt;...&gt;]</span>
+
+<span class="sd">        Example: the callback must be callable::</span>
+
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.build(&quot;target&quot;, 2)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            TypeError: callback must be callable</span>
+
+<span class="sd">        Example: at least one repetition required::</span>
+
+<span class="sd">            &gt;&gt;&gt; def target(): pass</span>
+<span class="sd">            &gt;&gt;&gt; builder = JobBuilder()</span>
+<span class="sd">            &gt;&gt;&gt; builder.build(target, 0)</span>
+<span class="sd">            Traceback (most recent call last):</span>
+<span class="sd">            ValueError: at least one repetition required</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">callable</span><span class="p">(</span><span class="n">callback</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;callback must be callable&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">repetitions</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;at least one repetition required&quot;</span><span class="p">)</span>
+
+        <span class="n">params_product</span> <span class="o">=</span> <span class="n">_dict_list_product</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_param_lists</span><span class="p">)</span>
+
+        <span class="n">jobs</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">params</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params_product</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">repetition_id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">repetitions</span><span class="p">):</span>
+                <span class="n">jobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">repetition_id</span><span class="p">,</span> <span class="n">callback</span><span class="p">,</span> <span class="n">params</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">jobs</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Multijob</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/multijob.html">multijob package</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../parallelTutorial.html">From scripts to GNU Parallel</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, the Multijob authors.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

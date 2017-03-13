@@ -1,0 +1,15 @@
+multijob package
+================
+
+.. automodule:: multijob
+    :members:
+    :show-inheritance:
+
+Submodules
+----------
+
+.. toctree::
+
+   multijob.commandline
+   multijob.job
+

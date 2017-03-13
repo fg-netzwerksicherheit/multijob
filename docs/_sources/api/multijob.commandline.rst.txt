@@ -1,0 +1,6 @@
+multijob.commandline module
+===========================
+
+.. automodule:: multijob.commandline
+    :members:
+    :show-inheritance:
