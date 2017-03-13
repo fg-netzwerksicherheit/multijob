@@ -59,8 +59,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Multijob'
-copyright = '2017, TODO authors'
-author = 'TODO authors'
+copyright = '2017, the Multijob authors'
+author = 'Multijob authors'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -153,7 +153,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'Multiprocessor.tex', 'Multiprocessor Documentation',
-     'TODO authors', 'manual'),
+     'Multijob authors', 'manual'),
 ]
 
 

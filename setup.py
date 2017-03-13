@@ -4,4 +4,7 @@ from setuptools import setup
 
 setup(
     name='multijob',
-    packages=['multijob'])
+    packages=['multijob'],
+    data_files=[
+        ('', ['LICENSE']),
+    ])
