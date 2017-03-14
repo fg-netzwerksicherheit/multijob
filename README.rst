@@ -6,6 +6,8 @@ When you have a job that you need to run many times in many configurations – t
 
 Read this document online: https://fg-netzwerksicherheit.github.io/multijob/
 
+Get the source on GitHub: https://github.com/fg-netzwerksicherheit/multijob
+
 Job parameters
 ==============
 
