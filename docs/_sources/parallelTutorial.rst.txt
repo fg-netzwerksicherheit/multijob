@@ -32,7 +32,7 @@ The command line parameters are represented in our code as :class:`multijob.job.
 The general workflow is:
 
 1.  Generate a list of job configurations with the :class:`multijob.job.JobBuilder`.
-2.  Turn the list into a shell script with :func:`multijob.command.shell_command_from_job`.
+2.  Turn the list into a shell script with :func:`multijob.commandline.shell_command_from_job`.
     This shell script can be seen as a job queue.
 3.  Process the job queue with GNU Parallel.
     This will invoke the ``runGA.py`` program.
@@ -122,7 +122,127 @@ Instead of using the predefined named coercions, you can always provide your own
 Converting a ``runGA()`` function to a ``runGA.py`` script
 ==========================================================
 
-TODO
+When moving to Multijob, you don't have to throw your existing code away:
+Multijob is absolutely framework-agnostic.
+We only need a function that takes all configuration parameters as (named) arguments.
+So as long as you have such a ``runGA()`` function or can easily write one, everything is good.
+
+In Python, it is possible to use a ``.py`` file as both a module that can be imported, and a script that can be executed directly.
+Anything that should be only run for a script has to be guarded, since top-level code is executed even for modules::
+
+    ... # always executed
+
+    if __name__ == '__main__':
+        ... # only executed when used as a script
+
+The ``runGA()`` function would be in the always-executed part.
+Our adaption code will live in the guarded section.
+
+To adapt this function, we only have to decode the command line parameters.
+As shown above, this requires a *typemap*.
+We then get a :class:`~multijob.job.Job` instance that can then be run.
+
+To construct the typemap, we look at the parameters for the ``runGA`` function.
+Usually, our typemap will have an entry for each named parameter.
+Here is a simple case::
+
+    def runGA(popsize, cxpb, mutpb, use_injection):
+        ...
+
+All parameters are named in the function definition, so we start writing our typemap::
+
+    TYPEMAP = dict(
+        popsize=...,
+        cxpb=...,
+        mutpb=...,
+        use_injection=...)
+
+We now have to select the types for these parameters.
+Note that the typemap does not contain classes or class names, but *coercion functions* that parse the parameter value from a string.
+Some constructors (like :func:`int`) happen to correctly parse any string they are given.
+For other constructors, this is not the case.
+For example, ``bool('False') == True``, so :func:`bool` *is not* a suitable coercion function.
+
+To solve such problems, common conversions can simply be specified as *named coercions*. Here::
+
+    TYPEMAP = dict(
+        popsize='int',
+        cxpb='float',
+        mutpb='float',
+        use_injection='bool')
+
+Not all functions are so easy.
+If the parameter list uses ``**kwargs`` to collect many named parameters, you'll have to trace the code to find the actual parameter names.
+If the parameter list slurps many ``*args`` into a list, you will have to provide a parameter called ``args`` in your TYPEMAP which then expects a list.
+Remember that all parameters are passed as named parameters, not as positional parameters.
+
+With the typemap, you can easily re-create a job from the command line arguments and execute it::
+
+    import sys
+    from multijob.commandline import job_from_argv
+
+    def runGA(a, b, c):
+        ...
+
+    TYPEMAP = dict(a=..., b=..., c=...)
+
+    if __name__ == '__main__':
+        job = job_from_argv(sys.argv[1:], runGA, typemap=TYPEMAP)
+        res = job.run()
+        ...
+
+Note that you have to skip the first command line parameter:
+``sys.argv[0]`` contains the name of the executable, not any real parameters.
+
+After you executed the job,
+the :class:`~multijob.job.JobResult` should be stored somewhere.
+It is best to use language-agnostic formats like CSV for this.
+
+If you are storing the results in a file, you will of course need different file names for each parameter configuration.
+The Job object includes :attr:`~multijob.job.Job.job_id` and :attr:`~multijob.job.Job.repetition_id` properties that can be used here.
+The :attr:`~multijob.job.Job.job_id` identifies the parameter configuration.
+If you repeated each configuration, the ``job_id`` is therefore not unique.
+Instead, the :attr:`~multijob.job.Job.repetition_id` identifies repetitions of the same `job_id`.
+
+To create a result file using both of these IDs, you could do::
+
+    filename = "results.{}.{}.csv".format(job.job_id, job.repetition_id)
+    with open(filename, 'w') as f:
+        ...
+
+This produces file names like ``results.3.7.csv``.
+
+Of course, Multijob imposes no restrictions on the file name so you can use whatever schema you want, or even use non-file-based solutions like REST APIs or databases.
+
+In my experience, it is best to put all of this plumbing into a separate ``main()`` function. For example::
+
+    import sys
+    from multijob.commandline import job_from_argv
+
+    def runGA(...):
+        ...
+
+    TYPEMAP = dict(...)
+
+    def main(argv):
+        job = job_from_argv(argv, runGA, typemap=TYPEMAP)
+        res = job.run()
+
+        filename = "results-{}-{}-logbook.csv".format(
+            job.job_id, job.repetition_id)
+        with open(filename, 'w') as f:
+            csv_file = csv.writer(f)
+            for record in res.result:
+                csv_file.writerow(record)
+
+    if __name__ == '__main__':
+        main(sys.argv[1:])
+
+Now that your actual algorithm has been wrapped as an independent shell script,
+you can test it by running the script directly.
+Remember that you will have to provide all parameters in the expected format, and that you have to provide a job id::
+
+    $ python runGA.py --id=0 --rep=0 -- x=7 y=42.3 z='foo bar'
 
 Creating the jobs
 =================
