@@ -268,7 +268,69 @@ Remember that you will have to provide all parameters in the expected format, an
 </div>
 <div class="section" id="creating-the-jobs">
 <h2>Creating the jobs<a class="headerlink" href="#creating-the-jobs" title="Permalink to this headline">¶</a></h2>
-<p>TODO</p>
+<p>The <a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder" title="multijob.job.JobBuilder"><code class="xref py py-class docutils literal"><span class="pre">multijob.job.JobBuilder</span></code></a> is used to generate all job configurations you want to run.
+For each parameter, you can specify a list of one or more possible values for this parameter.
+The job configurations are then the cartesian product of these lists.</p>
+<p>You have multiple possibilities to provide these lists:</p>
+<ul class="simple">
+<li><a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder.add" title="multijob.job.JobBuilder.add"><code class="xref py py-meth docutils literal"><span class="pre">builder.add(name,</span> <span class="pre">*values)</span></code></a>
+– explicitly provide the values. Recommended.</li>
+<li><a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder.add_range" title="multijob.job.JobBuilder.add_range"><code class="xref py py-meth docutils literal"><span class="pre">builder.add_range(name,</span> <span class="pre">start,</span> <span class="pre">stop,</span> <span class="pre">stride)</span></code></a>
+– add a list of floats, starting from the <code class="docutils literal"><span class="pre">start</span></code>, where the <code class="docutils literal"><span class="pre">stride</span></code> separates two consecutive numbers.</li>
+<li><a class="reference internal" href="api/multijob.job.html#multijob.job.JobBuilder.add_linspace" title="multijob.job.JobBuilder.add_linspace"><code class="xref py py-meth docutils literal"><span class="pre">builder.add_linspace(name,</span> <span class="pre">start,</span> <span class="pre">stop,</span> <span class="pre">n)</span></code></a>
+– add a list of <code class="docutils literal"><span class="pre">n</span></code> evenly spaced floats
+including the <code class="docutils literal"><span class="pre">start</span></code> and <code class="docutils literal"><span class="pre">stop</span></code>.</li>
+</ul>
+<p>Example:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">multijob.job</span> <span class="k">import</span> <span class="n">JobBuilder</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span> <span class="o">=</span> <span class="n">JobBuilder</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s1">&#39;explict&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="go">(1, 2, 3)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span><span class="o">.</span><span class="n">add_range</span><span class="p">(</span><span class="s1">&#39;range&#39;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="go">[0.0, 2.0, 4.0, 6.0]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span><span class="o">.</span><span class="n">add_linspace</span><span class="p">(</span><span class="s1">&#39;linspace&#39;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="go">[3.0, 4.0, 5.0, 6.0]</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal"><span class="pre">add_range()</span></code> and <code class="docutils literal"><span class="pre">add_linspace()</span></code> variants are only convenience functions.
+They have many problematic aspects:</p>
+<ul class="simple">
+<li>They only operate on floats.
+Because floats are inherently imprecise, you may see rounding problems.</li>
+<li>Also, their output is evenly spaced.
+Your parameters might benefit from a different distribution, e.g. more dense around zero, or selected randomly.
+Randomizing your values also prevents sampling artifacts.
+If you randomize your values, make sure to record the random generator seed to ensure reproducibility!</li>
+</ul>
+<p>When you specify many possible parameter values, this easily leads to a combinatorial explosion of job configurations.
+You may want to check for a sane number of configurations first.
+For that each builder can calculate the expected <code class="xref py py-meth docutils literal"><span class="pre">number_of_jobs()</span></code>.
+This only considers the number of distinct configurations that will be built, but does not consider repetitions.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">n_jobs</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">number_of_jobs</span><span class="p">()</span>
+<span class="n">max_jobs</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="k">if</span> <span class="n">n_jobs</span> <span class="o">&gt;</span> <span class="n">max_jobs</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+        <span class="s2">&quot;too many job configurations: </span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n_jobs</span><span class="p">,</span> <span class="n">max_jobs</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Finally, we generate the actual list of jobs.
+Since we want to turn the jobs into shell commands,
+these job instances will never be directly run.
+We can therefore use a dummy callback for the worker function:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">dummy</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="n">jobs</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">dummy</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For many uses, it makes sense to repeat each configuration multiple times.
+In the context of evolutionary algorithms, the results of a single run are not statistically significant.
+We need multiple repetitions of each configuration in order to draw reliable conclusions.
+The <code class="docutils literal"><span class="pre">build()</span></code> method can take a <code class="docutils literal"><span class="pre">repetitions</span></code> argument that specifies the number of repetitions of each config, it defaults to 1.</p>
+<p>The repeated job objects are identical (same param values, same job id) except for the repetition ID.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">jobs</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">dummy</span><span class="p">,</span> <span class="n">repetitions</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="turning-jobs-into-shell-commands">
 <h2>Turning jobs into shell commands<a class="headerlink" href="#turning-jobs-into-shell-commands" title="Permalink to this headline">¶</a></h2>

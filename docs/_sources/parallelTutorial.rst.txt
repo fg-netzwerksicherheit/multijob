@@ -247,7 +247,75 @@ Remember that you will have to provide all parameters in the expected format, an
 Creating the jobs
 =================
 
-TODO
+The :class:`multijob.job.JobBuilder` is used to generate all job configurations you want to run.
+For each parameter, you can specify a list of one or more possible values for this parameter.
+The job configurations are then the cartesian product of these lists.
+
+You have multiple possibilities to provide these lists:
+
+-   :meth:`builder.add(name, *values) <multijob.job.JobBuilder.add>`
+    – explicitly provide the values. Recommended.
+-   :meth:`builder.add_range(name, start, stop, stride) <multijob.job.JobBuilder.add_range>`
+    – add a list of floats, starting from the ``start``, where the ``stride`` separates two consecutive numbers.
+-   :meth:`builder.add_linspace(name, start, stop, n) <multijob.job.JobBuilder.add_linspace>`
+    – add a list of ``n`` evenly spaced floats
+    including the ``start`` and ``stop``.
+
+Example::
+
+    >>> from multijob.job import JobBuilder
+    >>> builder = JobBuilder()
+    >>> builder.add('explict', 1, 2, 3)
+    (1, 2, 3)
+    >>> builder.add_range('range', 0.0, 6.0, 2.0)
+    [0.0, 2.0, 4.0, 6.0]
+    >>> builder.add_linspace('linspace', 3.0, 6.0, 4)
+    [3.0, 4.0, 5.0, 6.0]
+
+The ``add_range()`` and ``add_linspace()`` variants are only convenience functions.
+They have many problematic aspects:
+
+-   They only operate on floats.
+    Because floats are inherently imprecise, you may see rounding problems.
+
+-   Also, their output is evenly spaced.
+    Your parameters might benefit from a different distribution, e.g. more dense around zero, or selected randomly.
+    Randomizing your values also prevents sampling artifacts.
+    If you randomize your values, make sure to record the random generator seed to ensure reproducibility!
+
+When you specify many possible parameter values, this easily leads to a combinatorial explosion of job configurations.
+You may want to check for a sane number of configurations first.
+For that each builder can calculate the expected :meth:`~multijob.job.Job.number_of_jobs`.
+This only considers the number of distinct configurations that will be built, but does not consider repetitions.
+
+::
+
+    n_jobs = builder.number_of_jobs()
+    max_jobs = 1000
+    if n_jobs > max_jobs:
+        raise RuntimeError(
+            "too many job configurations: {}/{}".format(n_jobs, max_jobs))
+
+Finally, we generate the actual list of jobs.
+Since we want to turn the jobs into shell commands,
+these job instances will never be directly run.
+We can therefore use a dummy callback for the worker function::
+
+    def dummy(**kwargs):
+        pass
+
+    jobs = builder.build(dummy)
+
+For many uses, it makes sense to repeat each configuration multiple times.
+In the context of evolutionary algorithms, the results of a single run are not statistically significant.
+We need multiple repetitions of each configuration in order to draw reliable conclusions.
+The ``build()`` method can take a ``repetitions`` argument that specifies the number of repetitions of each config, it defaults to 1.
+
+The repeated job objects are identical (same param values, same job id) except for the repetition ID.
+
+::
+
+    jobs = builder.build(dummy, repetitions=20)
 
 Turning jobs into shell commands
 ================================
