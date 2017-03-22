@@ -101,7 +101,10 @@ def _update_ex_message(ex, new_message, *args, **kwargs):
     """
 
     new_message = new_message.format(*args, **kwargs)
-    ex.args = (new_message + "\n" + ex.args[0], *ex.args[1:])
+    new_args = []
+    new_args.append(new_message + "\n" + ex.args[0])
+    new_args.extend(ex.args[1:])
+    ex.args = new_args
 
 def _perform_coercion(name, value, coercion):
     try:
