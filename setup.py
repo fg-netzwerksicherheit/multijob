@@ -7,4 +7,13 @@ setup(
     packages=['multijob'],
     data_files=[
         ('', ['LICENSE']),
-    ])
+    ],
+    setup_requires=[
+        'pytest-runner',
+    ],
+    tests_require=[
+        'pytest',
+        'pytest-describe',
+        'pytest-cov',
+    ],
+)
