@@ -1,10 +1,13 @@
 NAME = multijob
-SETUPPY := python setup.py
+
+# The Python interpreter to be used.
+# If necessary, set different Python with "make PYTHON=xxxx test"
+PYTHON = python3
+
+SETUPPY := $(PYTHON) setup.py
 AUTODOC_DEFAULTS := members,show-inheritance
-OPEN_BROWSER := xdg-open
 DOCS_SRC = ./docs-src
 DOCS_HTML_TARGET = ./docs
-
 
 .PHONY: all
 all: docs test
