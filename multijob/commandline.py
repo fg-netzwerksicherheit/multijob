@@ -525,7 +525,10 @@ def argv_from_job(job,
                              typemap=typemap,
                              default_coercion=default_coercion)
 
-    argv = [*meta, '--', *params]
+    argv = []
+    argv.extend(meta)
+    argv.append('--')
+    argv.extend(params)
 
     return argv
 
