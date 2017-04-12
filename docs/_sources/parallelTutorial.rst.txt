@@ -138,6 +138,9 @@ Anything that should be only run for a script has to be guarded, since top-level
 The ``runGA()`` function would be in the always-executed part.
 Our adaption code will live in the guarded section.
 
+Creating a Typemap to decode command line args
+----------------------------------------------
+
 To adapt this function, we only have to decode the command line parameters.
 As shown above, this requires a *typemap*.
 We then get a :class:`~multijob.job.Job` instance that can then be run.
@@ -176,6 +179,9 @@ If the parameter list uses ``**kwargs`` to collect many named parameters, you'll
 If the parameter list slurps many ``*args`` into a list, you will have to provide a parameter called ``args`` in your TYPEMAP which then expects a list.
 Remember that all parameters are passed as named parameters, not as positional parameters.
 
+Decoding and running the Job
+----------------------------
+
 With the typemap, you can easily re-create a job from the command line arguments and execute it::
 
     import sys
@@ -194,6 +200,9 @@ With the typemap, you can easily re-create a job from the command line arguments
 Note that you have to skip the first command line parameter:
 ``sys.argv[0]`` contains the name of the executable, not any real parameters.
 
+Storing results in a file
+-------------------------
+
 After you executed the job,
 the :class:`~multijob.job.JobResult` should be stored somewhere.
 It is best to use language-agnostic formats like CSV for this.
@@ -202,7 +211,7 @@ If you are storing the results in a file, you will of course need different file
 The Job object includes :attr:`~multijob.job.Job.job_id` and :attr:`~multijob.job.Job.repetition_id` properties that can be used here.
 The :attr:`~multijob.job.Job.job_id` identifies the parameter configuration.
 If you repeated each configuration, the ``job_id`` is therefore not unique.
-Instead, the :attr:`~multijob.job.Job.repetition_id` identifies repetitions of the same `job_id`.
+Instead, the :attr:`~multijob.job.Job.repetition_id` identifies repetitions of the same ``job_id``.
 
 To create a result file using both of these IDs, you could do::
 
@@ -320,7 +329,51 @@ The repeated job objects are identical (same param values, same job id) except f
 Turning jobs into shell commands
 ================================
 
-TODO
+The :func:`shell_command_from_job(prefix, job) <multijob.commandline.shell_command_from_job>` function
+can turn a :class:`~multijob.job.Job` object
+into a shell command.
+The ``prefix`` argument is the command that should be invoked with the job parameters as arguments.
+If you know the command name in advance, you can use it here::
+
+    shell_command_from_job('./target.exe', job)
+
+However, choosing a particular target executable is unnecessary at this point.
+By using a shell variable, we can defer the decision until run time.
+A variable will later make it easier to run distributed jobs on multiple servers.
+The variable also allows the same job definition file
+to be run with different target executables
+(e.g. a ``runGA.py`` script and a ``runGA`` native program).
+I recommend using the ``RUN_GA`` variable::
+
+    shell_command_from_job('$RUN_GA', job)
+
+By default, the job parameters are just converted to strings
+via the builtin :func:`str`.
+If this is not appropriate,
+you can provide a typemap to provide an explicit serialization.
+This is discussed in more detail above
+in the section `Typemaps and Coercions`_.
+
+The resulting commands should be written to a file, usually called ``jobs.sh``.
+This happens to be a valid shell script,
+though it should be rather understood as a line-by-line list of work items.
+
+You can create this file by just writing to STDOUT and piping the results into a file::
+
+    from multijob.commandline import shell_command_from_job
+
+    for job in jobs:
+        print(shell_command_from_job('$RUN_GA', job))
+
+Then on the commandline: ``python generate-jobs.py >jobs.sh``.
+
+If your job generation script produces additional output that does not belong into the jobs file, you will have to open a file explicitly::
+
+    from multijob.commandline import shell_command_from_job
+
+    with open('jobs.sh', 'w') as f:
+        for job in jobs:
+            print(shell_command_from_job('$RUN_GA', job), file=f)
 
 Executing jobs with ``parallel``
 ================================

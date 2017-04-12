@@ -167,6 +167,8 @@ Anything that should be only run for a script has to be guarded, since top-level
 </div>
 <p>The <code class="docutils literal"><span class="pre">runGA()</span></code> function would be in the always-executed part.
 Our adaption code will live in the guarded section.</p>
+<div class="section" id="creating-a-typemap-to-decode-command-line-args">
+<h3>Creating a Typemap to decode command line args<a class="headerlink" href="#creating-a-typemap-to-decode-command-line-args" title="Permalink to this headline">¶</a></h3>
 <p>To adapt this function, we only have to decode the command line parameters.
 As shown above, this requires a <em>typemap</em>.
 We then get a <a class="reference internal" href="api/multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">Job</span></code></a> instance that can then be run.</p>
@@ -202,6 +204,9 @@ For example, <code class="docutils literal"><span class="pre">bool('False')</spa
 If the parameter list uses <code class="docutils literal"><span class="pre">**kwargs</span></code> to collect many named parameters, you&#8217;ll have to trace the code to find the actual parameter names.
 If the parameter list slurps many <code class="docutils literal"><span class="pre">*args</span></code> into a list, you will have to provide a parameter called <code class="docutils literal"><span class="pre">args</span></code> in your TYPEMAP which then expects a list.
 Remember that all parameters are passed as named parameters, not as positional parameters.</p>
+</div>
+<div class="section" id="decoding-and-running-the-job">
+<h3>Decoding and running the Job<a class="headerlink" href="#decoding-and-running-the-job" title="Permalink to this headline">¶</a></h3>
 <p>With the typemap, you can easily re-create a job from the command line arguments and execute it:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">job_from_argv</span>
@@ -219,6 +224,9 @@ Remember that all parameters are passed as named parameters, not as positional p
 </div>
 <p>Note that you have to skip the first command line parameter:
 <code class="docutils literal"><span class="pre">sys.argv[0]</span></code> contains the name of the executable, not any real parameters.</p>
+</div>
+<div class="section" id="storing-results-in-a-file">
+<h3>Storing results in a file<a class="headerlink" href="#storing-results-in-a-file" title="Permalink to this headline">¶</a></h3>
 <p>After you executed the job,
 the <a class="reference internal" href="api/multijob.job.html#multijob.job.JobResult" title="multijob.job.JobResult"><code class="xref py py-class docutils literal"><span class="pre">JobResult</span></code></a> should be stored somewhere.
 It is best to use language-agnostic formats like CSV for this.</p>
@@ -226,7 +234,7 @@ It is best to use language-agnostic formats like CSV for this.</p>
 The Job object includes <a class="reference internal" href="api/multijob.job.html#multijob.job.Job.job_id" title="multijob.job.Job.job_id"><code class="xref py py-attr docutils literal"><span class="pre">job_id</span></code></a> and <a class="reference internal" href="api/multijob.job.html#multijob.job.Job.repetition_id" title="multijob.job.Job.repetition_id"><code class="xref py py-attr docutils literal"><span class="pre">repetition_id</span></code></a> properties that can be used here.
 The <a class="reference internal" href="api/multijob.job.html#multijob.job.Job.job_id" title="multijob.job.Job.job_id"><code class="xref py py-attr docutils literal"><span class="pre">job_id</span></code></a> identifies the parameter configuration.
 If you repeated each configuration, the <code class="docutils literal"><span class="pre">job_id</span></code> is therefore not unique.
-Instead, the <a class="reference internal" href="api/multijob.job.html#multijob.job.Job.repetition_id" title="multijob.job.Job.repetition_id"><code class="xref py py-attr docutils literal"><span class="pre">repetition_id</span></code></a> identifies repetitions of the same <cite>job_id</cite>.</p>
+Instead, the <a class="reference internal" href="api/multijob.job.html#multijob.job.Job.repetition_id" title="multijob.job.Job.repetition_id"><code class="xref py py-attr docutils literal"><span class="pre">repetition_id</span></code></a> identifies repetitions of the same <code class="docutils literal"><span class="pre">job_id</span></code>.</p>
 <p>To create a result file using both of these IDs, you could do:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;results.</span><span class="si">{}</span><span class="s2">.</span><span class="si">{}</span><span class="s2">.csv&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span> <span class="n">job</span><span class="o">.</span><span class="n">repetition_id</span><span class="p">)</span>
 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -264,6 +272,7 @@ you can test it by running the script directly.
 Remember that you will have to provide all parameters in the expected format, and that you have to provide a job id:</p>
 <div class="highlight-default"><div class="highlight"><pre><span></span>$ python runGA.py --id=0 --rep=0 -- x=7 y=42.3 z=&#39;foo bar&#39;
 </pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="creating-the-jobs">
@@ -334,7 +343,49 @@ The <code class="docutils literal"><span class="pre">build()</span></code> metho
 </div>
 <div class="section" id="turning-jobs-into-shell-commands">
 <h2>Turning jobs into shell commands<a class="headerlink" href="#turning-jobs-into-shell-commands" title="Permalink to this headline">¶</a></h2>
-<p>TODO</p>
+<p>The <a class="reference internal" href="api/multijob.commandline.html#multijob.commandline.shell_command_from_job" title="multijob.commandline.shell_command_from_job"><code class="xref py py-func docutils literal"><span class="pre">shell_command_from_job(prefix,</span> <span class="pre">job)</span></code></a> function
+can turn a <a class="reference internal" href="api/multijob.job.html#multijob.job.Job" title="multijob.job.Job"><code class="xref py py-class docutils literal"><span class="pre">Job</span></code></a> object
+into a shell command.
+The <code class="docutils literal"><span class="pre">prefix</span></code> argument is the command that should be invoked with the job parameters as arguments.
+If you know the command name in advance, you can use it here:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;./target.exe&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>However, choosing a particular target executable is unnecessary at this point.
+By using a shell variable, we can defer the decision until run time.
+A variable will later make it easier to run distributed jobs on multiple servers.
+The variable also allows the same job definition file
+to be run with different target executables
+(e.g. a <code class="docutils literal"><span class="pre">runGA.py</span></code> script and a <code class="docutils literal"><span class="pre">runGA</span></code> native program).
+I recommend using the <code class="docutils literal"><span class="pre">RUN_GA</span></code> variable:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;$RUN_GA&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>By default, the job parameters are just converted to strings
+via the builtin <code class="xref py py-func docutils literal"><span class="pre">str()</span></code>.
+If this is not appropriate,
+you can provide a typemap to provide an explicit serialization.
+This is discussed in more detail above
+in the section <a class="reference internal" href="#typemaps-and-coercions">Typemaps and Coercions</a>.</p>
+<p>The resulting commands should be written to a file, usually called <code class="docutils literal"><span class="pre">jobs.sh</span></code>.
+This happens to be a valid shell script,
+though it should be rather understood as a line-by-line list of work items.</p>
+<p>You can create this file by just writing to STDOUT and piping the results into a file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">shell_command_from_job</span>
+
+<span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">jobs</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;$RUN_GA&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Then on the commandline: <code class="docutils literal"><span class="pre">python</span> <span class="pre">generate-jobs.py</span> <span class="pre">&gt;jobs.sh</span></code>.</p>
+<p>If your job generation script produces additional output that does not belong into the jobs file, you will have to open a file explicitly:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">multijob.commandline</span> <span class="k">import</span> <span class="n">shell_command_from_job</span>
+
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;jobs.sh&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">jobs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">shell_command_from_job</span><span class="p">(</span><span class="s1">&#39;$RUN_GA&#39;</span><span class="p">,</span> <span class="n">job</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">f</span><span class="p">)</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="executing-jobs-with-parallel">
 <h2>Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-with-parallel" title="Permalink to this headline">¶</a></h2>
@@ -367,7 +418,12 @@ The <code class="docutils literal"><span class="pre">build()</span></code> metho
 <li><a class="reference internal" href="#">From scripts to GNU Parallel</a><ul>
 <li><a class="reference internal" href="#concepts-and-architecture">Concepts and Architecture</a></li>
 <li><a class="reference internal" href="#typemaps-and-coercions">Typemaps and Coercions</a></li>
-<li><a class="reference internal" href="#converting-a-runga-function-to-a-runga-py-script">Converting a <code class="docutils literal"><span class="pre">runGA()</span></code> function to a <code class="docutils literal"><span class="pre">runGA.py</span></code> script</a></li>
+<li><a class="reference internal" href="#converting-a-runga-function-to-a-runga-py-script">Converting a <code class="docutils literal"><span class="pre">runGA()</span></code> function to a <code class="docutils literal"><span class="pre">runGA.py</span></code> script</a><ul>
+<li><a class="reference internal" href="#creating-a-typemap-to-decode-command-line-args">Creating a Typemap to decode command line args</a></li>
+<li><a class="reference internal" href="#decoding-and-running-the-job">Decoding and running the Job</a></li>
+<li><a class="reference internal" href="#storing-results-in-a-file">Storing results in a file</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#creating-the-jobs">Creating the jobs</a></li>
 <li><a class="reference internal" href="#turning-jobs-into-shell-commands">Turning jobs into shell commands</a></li>
 <li><a class="reference internal" href="#executing-jobs-with-parallel">Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
