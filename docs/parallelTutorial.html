@@ -387,12 +387,70 @@ though it should be rather understood as a line-by-line list of work items.</p>
 </pre></div>
 </div>
 </div>
-<div class="section" id="executing-jobs-with-parallel">
-<h2>Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-with-parallel" title="Permalink to this headline">¶</a></h2>
-<p>TODO</p>
+<div class="section" id="executing-jobs-locally-with-parallel">
+<h2>Executing jobs locally with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-locally-with-parallel" title="Permalink to this headline">¶</a></h2>
+<p>Running the jobs locally is fairly easy:
+We just pipe the <code class="docutils literal"><span class="pre">jobs.sh</span></code> file into <code class="docutils literal"><span class="pre">parallel</span></code>.
+This will read the file line by line and execute each line as an individual shell script.
+By default, this will try to utilize your CPU optimally, and will run one job per available logical CPU.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="c1"># Minimal usage:</span>
+$ parallel &lt;jobs.sh
+</pre></div>
 </div>
-<div class="section" id="suggested-workflow-and-conventions">
-<h2>Suggested workflow and conventions<a class="headerlink" href="#suggested-workflow-and-conventions" title="Permalink to this headline">¶</a></h2>
+<p>However, GNU Parallel provides many additional useful options.
+Of these, <code class="docutils literal"><span class="pre">--eta</span></code> and <code class="docutils literal"><span class="pre">joblog</span> <span class="pre">LOGFILE</span></code> are must-have options:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="c1"># Recommended usage</span>
+$ parallel --eta --joblog .parallel-log &lt;jobs.sh
+</pre></div>
+</div>
+<dl class="docutils">
+<dt><code class="docutils literal"><span class="pre">--eta</span></code></dt>
+<dd><p class="first">Prints regular progress information
+and tries to estimate the remaining time until completion of all jobs.
+The estimates are unreliable until the first batch of jobs has completed.</p>
+<p class="last">This option is extremely useful feedback for monitoring,
+and for using your intermediate time.
+Since the number of completed jobs is slowly going up,
+you can see that the experiment is in fact making progress.
+If the time estimate is longer than expected,
+you may want to schedule the experiment for a time where you are absent,
+e.g. over night or over a weekend.</p>
+</dd>
+<dt><code class="docutils literal"><span class="pre">--jobs</span> <span class="pre">N</span></code></dt>
+<dd>Limits the number of parallel jobs.
+This is mostly useful for testing where you don&#8217;t want to run with full power.</dd>
+<dt><code class="docutils literal"><span class="pre">--joblog</span> <span class="pre">LOGFILE</span></code></dt>
+<dd><p class="first">Causes <code class="docutils literal"><span class="pre">parallel</span></code> to keep track of which jobs were started and run.
+If the jobs were interrupted (e.g. network connection loss),
+they can then be resumed later.</p>
+<p>To resume processing, use the exact same set of options
+but add the <code class="docutils literal"><span class="pre">--resume</span></code> flag.
+This will continue with the next job that wasn&#8217;t run.
+In practice, it is probably better to use <code class="docutils literal"><span class="pre">--resume-failed</span></code>
+since the cause of interruption will likely cause jobs to fail.
+That way, any job that was recorded as completed-but-failed will also be run.</p>
+<p class="last">Resuming will only work correctly if the exact same options are used.
+This also means that the <code class="docutils literal"><span class="pre">jobs.sh</span></code> file should not be modified.</p>
+</dd>
+<dt><code class="docutils literal"><span class="pre">--line-buffer</span></code></dt>
+<dd><p class="first">Switch buffering mode to line-buffers.</p>
+<p>By default (<code class="docutils literal"><span class="pre">--group</span></code>),
+the complete output (STDOUT, STDERR) is buffered until that job completes,
+and is then printed out at once.
+This avoids that the input of multiple jobs is intermingled, but also means that the output is deferred.
+This also requires extra storage and processing power.</p>
+<p>Depending on your programs, it can be better to switch to line buffering,
+or to deactivate output buffering entirely.
+With line buffering, each line is printed as soon as it is complete.
+That means output arrives sooner, but lines of multiple jobs are intermingled without any indication which line belongs to which job.</p>
+<p>You can <code class="docutils literal"><span class="pre">--tag</span></code> the output lines but by default that will prepend all arguments, which is likely to be unreadable.
+Instead, consider a custom <code class="docutils literal"><span class="pre">--tagstring</span> <span class="pre">PATTERN</span></code>, e.g. with a pattern like <code class="docutils literal"><span class="pre">&quot;{#}&quot;</span></code>, which would be the GNU Parallel job ID.</p>
+<p class="last">To turn buffering off completely, use <code class="docutils literal"><span class="pre">--ungroup</span></code>.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="executing-jobs-remotely-with-parallel">
+<h2>Executing jobs remotely with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-remotely-with-parallel" title="Permalink to this headline">¶</a></h2>
 <p>TODO</p>
 </div>
 </div>
@@ -426,8 +484,8 @@ though it should be rather understood as a line-by-line list of work items.</p>
 </li>
 <li><a class="reference internal" href="#creating-the-jobs">Creating the jobs</a></li>
 <li><a class="reference internal" href="#turning-jobs-into-shell-commands">Turning jobs into shell commands</a></li>
-<li><a class="reference internal" href="#executing-jobs-with-parallel">Executing jobs with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
-<li><a class="reference internal" href="#suggested-workflow-and-conventions">Suggested workflow and conventions</a></li>
+<li><a class="reference internal" href="#executing-jobs-locally-with-parallel">Executing jobs locally with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
+<li><a class="reference internal" href="#executing-jobs-remotely-with-parallel">Executing jobs remotely with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
 </ul>
 </li>
 </ul>

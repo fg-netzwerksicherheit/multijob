@@ -375,12 +375,79 @@ If your job generation script produces additional output that does not belong in
         for job in jobs:
             print(shell_command_from_job('$RUN_GA', job), file=f)
 
-Executing jobs with ``parallel``
-================================
+Executing jobs locally with ``parallel``
+========================================
 
-TODO
+Running the jobs locally is fairly easy:
+We just pipe the ``jobs.sh`` file into ``parallel``.
+This will read the file line by line and execute each line as an individual shell script.
+By default, this will try to utilize your CPU optimally, and will run one job per available logical CPU.
 
-Suggested workflow and conventions
-==================================
+.. code-block:: sh
+
+    # Minimal usage:
+    $ parallel <jobs.sh
+
+However, GNU Parallel provides many additional useful options.
+Of these, ``--eta`` and ``joblog LOGFILE`` are must-have options:
+
+.. code-block:: sh
+
+    # Recommended usage
+    $ parallel --eta --joblog .parallel-log <jobs.sh
+
+``--eta``
+    Prints regular progress information
+    and tries to estimate the remaining time until completion of all jobs.
+    The estimates are unreliable until the first batch of jobs has completed.
+
+    This option is extremely useful feedback for monitoring,
+    and for using your intermediate time.
+    Since the number of completed jobs is slowly going up,
+    you can see that the experiment is in fact making progress.
+    If the time estimate is longer than expected,
+    you may want to schedule the experiment for a time where you are absent,
+    e.g. over night or over a weekend.
+
+``--jobs N``
+    Limits the number of parallel jobs.
+    This is mostly useful for testing where you don't want to run with full power.
+
+``--joblog LOGFILE``
+    Causes ``parallel`` to keep track of which jobs were started and run.
+    If the jobs were interrupted (e.g. network connection loss),
+    they can then be resumed later.
+
+    To resume processing, use the exact same set of options
+    but add the ``--resume`` flag.
+    This will continue with the next job that wasn't run.
+    In practice, it is probably better to use ``--resume-failed``
+    since the cause of interruption will likely cause jobs to fail.
+    That way, any job that was recorded as completed-but-failed will also be run.
+
+    Resuming will only work correctly if the exact same options are used.
+    This also means that the ``jobs.sh`` file should not be modified.
+
+``--line-buffer``
+    Switch buffering mode to line-buffers.
+
+    By default (``--group``),
+    the complete output (STDOUT, STDERR) is buffered until that job completes, 
+    and is then printed out at once.
+    This avoids that the input of multiple jobs is intermingled, but also means that the output is deferred.
+    This also requires extra storage and processing power.
+
+    Depending on your programs, it can be better to switch to line buffering,
+    or to deactivate output buffering entirely.
+    With line buffering, each line is printed as soon as it is complete.
+    That means output arrives sooner, but lines of multiple jobs are intermingled without any indication which line belongs to which job.
+
+    You can ``--tag`` the output lines but by default that will prepend all arguments, which is likely to be unreadable.
+    Instead, consider a custom ``--tagstring PATTERN``, e.g. with a pattern like ``"{#}"``, which would be the GNU Parallel job ID.
+
+    To turn buffering off completely, use ``--ungroup``.
+
+Executing jobs remotely with ``parallel``
+=========================================
 
 TODO
