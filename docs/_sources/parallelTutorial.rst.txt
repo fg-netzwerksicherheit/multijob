@@ -450,4 +450,96 @@ Of these, ``--eta`` and ``joblog LOGFILE`` are must-have options:
 Executing jobs remotely with ``parallel``
 =========================================
 
+To run a job on remote servers, we have to tackle two problems:
+
+* initialize the necessary environment for the job (data files, tools, libraries)
+* connect to the server, transfer any files, run the experiment, and transfer results back
+
+Initializing the remote environment
+-----------------------------------
+
+Because we have to initialize the remote environment first,
+we cannot run our target executable ``runGA.py`` directly.
+Instead, we'll have to create a wrapper script
+that initializes the environment
+and then runs the actual script.
+
+This ``remote-job.sh`` script will:
+
+* unpack any data files that were transferred as an archive
+* initialize the environment
+* run the actual command
+* gather any output files into a results archive
+
+The results archive must have a name that is known by GNU Parallel so that it can be transferred back.
+To that end, the ``remote-job.sh`` will receive
+a sequence ID as one parameter,
+and of course the line from ``jobs.sh`` as another argument.
+In our script, we'll call these ``seq_id`` and ``target_exe``, respectively.
+
+Unpacking the data may just be a case of un-tarring any data files:
+
+.. code-block:: sh
+
+    tar xzf data.tar.gz
+
+How your environment needs to be initialized depends entirely on your system.
+In simple cases, it will suffice to activate a *venv* Python virtual environment that was pre-installed at a known location on the target server:
+
+.. code-block:: sh
+
+    source path/to/venv/bin/activate
+
+In other cases, you may want to adjust environment variables like ``PATH``.
+
+To run the job, we need to resolve the ``RUN_GA`` environment variable.
+Since the given ``jobs.sh`` line is given to the ``remote-job.sh`` script as a single string, we will need to ``exec`` it.
+
+We should also write any output to a log file, though this not technically necessary.
+Using STDOUT is probably easier when debugging a concrete problem,
+but a logfile de-clutters possible output.
+The correct choice, as always, depends on your circumstances.
+
+.. code-block:: sh
+
+    RUN_GA='python runGA.py'
+    eval "$target_exe >logfile_${seq_id}.txt 2>&1"
+
+Finally, we need to pack any output files into the results archive.
+This would be the logfile produced above, and any result files.
+For example:
+
+.. code-block:: sh
+
+    tar czf results-${seq_id}.tar.gz \
+            result_*.csv logfile_*.csv
+
+Together, the complete script would like this.
+Note that we ``set -e`` so that the whole script will fail as soon as any command fails.
+This fail-fast behaviour makes it more likely that errors will be spotted early, before you spent many hours running a potentially flawed experiment.
+
+.. code-block:: sh
+
+    #!/bin/bash
+    set -e
+    seq_id="$1"
+    target_exe="$2"
+
+    # unpack data files
+    tar xzf data.tar.gz
+
+    # initialize environment
+    source path/to/venv/bin/activate
+
+    # run experiment
+    RUN_GA='python runGA.py'
+    eval "$target_exe >logfile_${seq_id}.txt 2>&1"
+
+    # gather results
+    tar czf results-${seq_id}.tar.gz \
+            result_*.csv logfile_*.csv
+
+Running the remote job
+----------------------
+
 TODO

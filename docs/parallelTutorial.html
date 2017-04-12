@@ -451,7 +451,85 @@ Instead, consider a custom <code class="docutils literal"><span class="pre">--ta
 </div>
 <div class="section" id="executing-jobs-remotely-with-parallel">
 <h2>Executing jobs remotely with <code class="docutils literal"><span class="pre">parallel</span></code><a class="headerlink" href="#executing-jobs-remotely-with-parallel" title="Permalink to this headline">¶</a></h2>
+<p>To run a job on remote servers, we have to tackle two problems:</p>
+<ul class="simple">
+<li>initialize the necessary environment for the job (data files, tools, libraries)</li>
+<li>connect to the server, transfer any files, run the experiment, and transfer results back</li>
+</ul>
+<div class="section" id="initializing-the-remote-environment">
+<h3>Initializing the remote environment<a class="headerlink" href="#initializing-the-remote-environment" title="Permalink to this headline">¶</a></h3>
+<p>Because we have to initialize the remote environment first,
+we cannot run our target executable <code class="docutils literal"><span class="pre">runGA.py</span></code> directly.
+Instead, we&#8217;ll have to create a wrapper script
+that initializes the environment
+and then runs the actual script.</p>
+<p>This <code class="docutils literal"><span class="pre">remote-job.sh</span></code> script will:</p>
+<ul class="simple">
+<li>unpack any data files that were transferred as an archive</li>
+<li>initialize the environment</li>
+<li>run the actual command</li>
+<li>gather any output files into a results archive</li>
+</ul>
+<p>The results archive must have a name that is known by GNU Parallel so that it can be transferred back.
+To that end, the <code class="docutils literal"><span class="pre">remote-job.sh</span></code> will receive
+a sequence ID as one parameter,
+and of course the line from <code class="docutils literal"><span class="pre">jobs.sh</span></code> as another argument.
+In our script, we&#8217;ll call these <code class="docutils literal"><span class="pre">seq_id</span></code> and <code class="docutils literal"><span class="pre">target_exe</span></code>, respectively.</p>
+<p>Unpacking the data may just be a case of un-tarring any data files:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>tar xzf data.tar.gz
+</pre></div>
+</div>
+<p>How your environment needs to be initialized depends entirely on your system.
+In simple cases, it will suffice to activate a <em>venv</em> Python virtual environment that was pre-installed at a known location on the target server:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="nb">source</span> path/to/venv/bin/activate
+</pre></div>
+</div>
+<p>In other cases, you may want to adjust environment variables like <code class="docutils literal"><span class="pre">PATH</span></code>.</p>
+<p>To run the job, we need to resolve the <code class="docutils literal"><span class="pre">RUN_GA</span></code> environment variable.
+Since the given <code class="docutils literal"><span class="pre">jobs.sh</span></code> line is given to the <code class="docutils literal"><span class="pre">remote-job.sh</span></code> script as a single string, we will need to <code class="docutils literal"><span class="pre">exec</span></code> it.</p>
+<p>We should also write any output to a log file, though this not technically necessary.
+Using STDOUT is probably easier when debugging a concrete problem,
+but a logfile de-clutters possible output.
+The correct choice, as always, depends on your circumstances.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="nv">RUN_GA</span><span class="o">=</span><span class="s1">&#39;python runGA.py&#39;</span>
+<span class="nb">eval</span> <span class="s2">&quot;</span><span class="nv">$target_exe</span><span class="s2"> &gt;logfile_</span><span class="si">${</span><span class="nv">seq_id</span><span class="si">}</span><span class="s2">.txt 2&gt;&amp;1&quot;</span>
+</pre></div>
+</div>
+<p>Finally, we need to pack any output files into the results archive.
+This would be the logfile produced above, and any result files.
+For example:</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span>tar czf results-<span class="si">${</span><span class="nv">seq_id</span><span class="si">}</span>.tar.gz <span class="se">\</span>
+        result_*.csv logfile_*.csv
+</pre></div>
+</div>
+<p>Together, the complete script would like this.
+Note that we <code class="docutils literal"><span class="pre">set</span> <span class="pre">-e</span></code> so that the whole script will fail as soon as any command fails.
+This fail-fast behaviour makes it more likely that errors will be spotted early, before you spent many hours running a potentially flawed experiment.</p>
+<div class="highlight-sh"><div class="highlight"><pre><span></span><span class="ch">#!/bin/bash</span>
+<span class="nb">set</span> -e
+<span class="nv">seq_id</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$1</span><span class="s2">&quot;</span>
+<span class="nv">target_exe</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$2</span><span class="s2">&quot;</span>
+
+<span class="c1"># unpack data files</span>
+tar xzf data.tar.gz
+
+<span class="c1"># initialize environment</span>
+<span class="nb">source</span> path/to/venv/bin/activate
+
+<span class="c1"># run experiment</span>
+<span class="nv">RUN_GA</span><span class="o">=</span><span class="s1">&#39;python runGA.py&#39;</span>
+<span class="nb">eval</span> <span class="s2">&quot;</span><span class="nv">$target_exe</span><span class="s2"> &gt;logfile_</span><span class="si">${</span><span class="nv">seq_id</span><span class="si">}</span><span class="s2">.txt 2&gt;&amp;1&quot;</span>
+
+<span class="c1"># gather results</span>
+tar czf results-<span class="si">${</span><span class="nv">seq_id</span><span class="si">}</span>.tar.gz <span class="se">\</span>
+        result_*.csv logfile_*.csv
+</pre></div>
+</div>
+</div>
+<div class="section" id="running-the-remote-job">
+<h3>Running the remote job<a class="headerlink" href="#running-the-remote-job" title="Permalink to this headline">¶</a></h3>
 <p>TODO</p>
+</div>
 </div>
 </div>
 
@@ -485,7 +563,11 @@ Instead, consider a custom <code class="docutils literal"><span class="pre">--ta
 <li><a class="reference internal" href="#creating-the-jobs">Creating the jobs</a></li>
 <li><a class="reference internal" href="#turning-jobs-into-shell-commands">Turning jobs into shell commands</a></li>
 <li><a class="reference internal" href="#executing-jobs-locally-with-parallel">Executing jobs locally with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
-<li><a class="reference internal" href="#executing-jobs-remotely-with-parallel">Executing jobs remotely with <code class="docutils literal"><span class="pre">parallel</span></code></a></li>
+<li><a class="reference internal" href="#executing-jobs-remotely-with-parallel">Executing jobs remotely with <code class="docutils literal"><span class="pre">parallel</span></code></a><ul>
+<li><a class="reference internal" href="#initializing-the-remote-environment">Initializing the remote environment</a></li>
+<li><a class="reference internal" href="#running-the-remote-job">Running the remote job</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
