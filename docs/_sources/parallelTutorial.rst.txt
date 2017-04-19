@@ -375,6 +375,8 @@ If your job generation script produces additional output that does not belong in
         for job in jobs:
             print(shell_command_from_job('$RUN_GA', job), file=f)
 
+.. _executing-jobs-locally-with-parallel:
+
 Executing jobs locally with ``parallel``
 ========================================
 
@@ -539,7 +541,137 @@ This fail-fast behaviour makes it more likely that errors will be spotted early,
     tar czf results-${seq_id}.tar.gz \
             result_*.csv logfile_*.csv
 
+.. _preparing-ssh-connections:
+
+Preparing SSH connections
+-------------------------
+
+GNU Parallel needs to be able to log into the remote servers
+without a password.
+I.e. the controlling user must upload a public key to the remote servers,
+and add the corresponding private key to their keyring session.
+See ``ssh-agent`` for info on the keyring.
+You can add keys with ``ssh-add``.
+
+By default, there will be
+one SSH connection per available CPU to each remote host.
+Usually, the SSH server has a fairly low connection limit
+which can cause some GNU Parallel connections to be refused.
+For large servers,
+you will have to edit the *sshd* configuration to raise the limit.
+At the very least, you will need to allow as many connections as you have CPUs, 
+plus at least two additional connections.
+
+We can later list all remote hosts on the commandline,
+or store them in an ``--sshloginfile``.
+This text file contains one hostname per line,
+plus additional flags e.g. to limit the number of concurrent jobs on that host.
+
 Running the remote job
 ----------------------
 
-TODO
+We now need to transfer all these files to the server and run them.
+This implies the various options for running the script locally,
+as explained in section :ref:`executing-jobs-locally-with-parallel`.
+
+Instead of running the target executable directly,
+we want to actually run the wrapper script on the server:
+
+.. code-block:: sh
+
+    $ parallel OPTIONS... ./remote-job.sh '{#}' '{}' <jobs.sh
+
+The placeholders ``{#}`` and ``{}`` will be replaced by GNU Parallel
+to provide the actual arguments.
+The ``{#}`` is the GNU Parallel job id,
+which is used as `seq_id` in the script.
+The ``{}`` is one line from the ``jobs.sh`` file,
+i.e. the job configuration as a shell script snippet.
+
+Required options:
+
+``--workdir DIRECTORY``
+    The job will be executed in some particular ``--workdir``.
+
+    You can specify a path to a directory,
+    but then all concurrent jobs will share this directory.
+    If you write your ``remote-job.sh`` to reflect this,
+    a pre-configured path can be OK.
+    E.g. the ``remote-job.sh`` could use the ``seq_id``
+    to create a temporary subdir.
+    The advantage of a known directory is that
+    any data files only need to be transferred once,
+    and that you can pre-configure the environment.
+
+    This complication is usually undesirable,
+    so we can get a temporary directory by giving GNU Parallel a triple dot:
+    ``--workdir ...``.
+    However, now all files have to be transferred again for each job,
+    or manually before the experiment to a known location on the server.
+
+``--transferfile FILE``
+    Files that should be transferred to the remote host for each job
+    are given with ``--transferfile``.
+    In particular, this is
+    the data archive ``data.tar.gz``,
+    the ``remote-job.sh`` script, and
+    the target executable (e.g. ``runGA.py``).
+    This option is repeated for each file:
+
+    .. code-block:: sh
+
+        parallel OPTIONS... \
+            --transferfile data.tar.gz \
+            --transferfile remote-job.sh \
+            --transferfile runGA.py \
+            COMMAND ARGS...
+
+``--return FILE``
+    Files that should be returned from the remote server
+    have to be listed with ``--return``.
+    In our case, this would be the result archive ``results-${seq_id}.tar.gz``.
+    To generate the correct name with the ID,
+    GNU Parallel can perform a substitution:
+    ``--return 'results-{#}.tar.gz'``.
+
+``--cleanup``
+    Any transferred files and the temporary directory
+    should be deleted afterwards.
+
+``--sshlogin HOST``, ``--sshloginfile FILE``
+    A list of remote hosts.
+    The ``--sshlogin`` option is repeated for each remote host.
+    See the section :ref:`preparing-ssh-connections` for details.
+
+After collecting the data files,
+these options allow you to run the jobs remotely.
+Afterwards, we can unpack the result archives and perform any analysis:
+
+.. code-block:: sh
+
+    # Create the data archive
+    tar czf data.tar.gz data/
+
+    # Run the job remotely
+    parallel                            \
+        --hostname worker.example.com   \
+        --workdir ...                   \
+        --transferfile data.tar.gz      \
+        --transferfile remote-job.sh    \
+        --transferfile runGA.py         \
+        --return 'result-{#}.tar.gz'    \
+        --cleanup                       \
+        --eta                           \
+        --joblog .joblog                \
+        ./remote-job.sh '{#}' '{}' <jobs.sh
+
+    # Unpack the results
+    parallel tar xzf ::: result-*.tar.gz
+
+    # Clean unneeded files
+    rm -f data.tar.gz result-*.tar.gz
+
+And that's it!
+This looks like a lot,
+but you probably only need half the details mentioned here,
+and everything will be easier the second time.
