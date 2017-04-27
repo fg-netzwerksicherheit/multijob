@@ -16,5 +16,7 @@ __pycache__/
 *.egg-info/
 /docs-src/api/
 
+coverage.out
+
 # exclude my virtualenv
 /.py3
