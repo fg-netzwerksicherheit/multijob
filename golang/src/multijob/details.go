@@ -53,6 +53,20 @@ func splitArg(arg string) (key string, value string, err error) {
 	return
 }
 
+func joinSortedQuotedItems(items []string, sep string) string {
+	strs := make([]string, len(items))
+	copy(strs, items)
+
+	sort.Strings(strs)
+
+	// quote the keys
+	for i, k := range strs {
+		strs[i] = strconv.QuoteToASCII(k)
+	}
+
+	return strings.Join(strs, sep)
+}
+
 // joinKeys joins the sorted keys of a map.
 func joinKeys(m map[string]string, sep string) string {
 	keys := make([]string, len(m))
@@ -64,12 +78,5 @@ func joinKeys(m map[string]string, sep string) string {
 		i++
 	}
 
-	sort.Strings(keys)
-
-	// quote the keys
-	for i, k := range keys {
-		keys[i] = strconv.QuoteToASCII(k)
-	}
-
-	return strings.Join(keys, sep)
+	return joinSortedQuotedItems(keys, sep)
 }

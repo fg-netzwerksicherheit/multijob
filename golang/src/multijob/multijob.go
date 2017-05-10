@@ -1,11 +1,29 @@
+// Parse the Multijob command line interface.
+// This allows you to implement Multijob tasks in Go.
+//
+//      args, err := multijob.ParseCommandLine(args, nil)
+//      if err != nil {
+//          ...
+//      }
+//
+//      x, err := args.GetStr("x")
+//      if err != nil {
+//          ...
+//      }
+//
+//      if err = args.NoFurtherArguments(); err != nil {
+//          ...
+//      }
 package multijob
 
 import "fmt"
 import "strconv"
 
+// JobArgvConfig lets you change the names of the special "--id" and "--rep"
+// parameters.
 type JobArgvConfig struct {
-	jobIDKey        string
-	repetitionIDKey string
+	JobIDKey        string // JobIDKey is the name of the "--id" argument.
+	RepetitionIDKey string // RepetitionIDKey is the name of the "--rep" argument.
 }
 
 var defaultJobArgvConfig JobArgvConfig = JobArgvConfig{"--id", "--rep"}
@@ -27,29 +45,29 @@ func ParseCommandline(argv []string, config *JobArgvConfig) (args *Args, err err
 	specialArgs, normalArgs, err := separateArgvIntoSpecialAndNormalKVs(
 		argv, separator)
 
-	jobIDStr, ok := specialArgs[config.jobIDKey]
+	jobIDStr, ok := specialArgs[config.JobIDKey]
 	if !ok {
 		err = fmt.Errorf("multijob: special JobID argument %q required",
-			config.jobIDKey)
+			config.JobIDKey)
 		return
 	}
 
-	repetitionIDStr, ok := specialArgs[config.repetitionIDKey]
+	repetitionIDStr, ok := specialArgs[config.RepetitionIDKey]
 	if !ok {
 		err = fmt.Errorf("multijob: special RepetitionID argument %q required",
-			config.repetitionIDKey)
+			config.RepetitionIDKey)
 		return
 	}
 
-	delete(specialArgs, config.jobIDKey)
-	delete(specialArgs, config.repetitionIDKey)
+	delete(specialArgs, config.JobIDKey)
+	delete(specialArgs, config.RepetitionIDKey)
 
 	if len(specialArgs) > 0 {
 		err = fmt.Errorf(
 			"multijob: unknown special arguments before %q separator: ",
 			separator,
 			joinKeys(specialArgs, " "))
-        return
+		return
 	}
 
 	jobID, err := strconv.Atoi(jobIDStr)
@@ -63,14 +81,39 @@ func ParseCommandline(argv []string, config *JobArgvConfig) (args *Args, err err
 		err = fmt.Errorf("multijob: can't parse RepetitionID %q: %s", repetitionIDStr, err.Error())
 	}
 
-	args = &Args{jobID, repetitionID, normalArgs}
+	args = &Args{
+		JobID:        jobID,
+		RepetitionID: repetitionID,
+		args:         normalArgs,
+		argWasUsed:   make(map[string]bool),
+	}
 	return
 }
 
+// Args represents the parsed arguments.
+// You may retrieve arguments via the "Get*" methods, e.g. "GetStr()".
 type Args struct {
 	JobID        int
 	RepetitionID int
 	args         map[string]string
+	argWasUsed   map[string]bool
+}
+
+func (args *Args) NoFurtherArguments() (err error) {
+	unusedArgs := make([]string, 0, len(args.args))
+	for k, _ := range args.args {
+		if _, ok := args.argWasUsed[k]; !ok {
+			unusedArgs = append(unusedArgs, k)
+		}
+	}
+
+	if len(unusedArgs) > 0 {
+		err = fmt.Errorf(
+			"multijob: Unused arguments remain: %s",
+			joinSortedQuotedItems(unusedArgs, ", "))
+	}
+
+	return
 }
 
 // GetStr retrieves a string value from the command line arguments.
@@ -79,5 +122,6 @@ func (args *Args) GetStr(key string) (value string, err error) {
 	if !ok {
 		err = fmt.Errorf("multijob: no %q argument", key)
 	}
+	args.argWasUsed[key] = true
 	return
 }

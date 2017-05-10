@@ -51,15 +51,15 @@ func TestDecodesIDsErrors(t *testing.T) {
 
 	cases := []failureCase{
 		{"missing --rep",
-            []string{"--id=0", "--"}},
+			[]string{"--id=0", "--"}},
 		{"missing --id",
-            []string{"--rep=0", "--"}},
+			[]string{"--rep=0", "--"}},
 		{"unknown special arg",
 			[]string{"--id=0", "--rep=0", "--this doesn't exist=0", "--"}},
 		{"Id is not numeric",
-            []string{"--id=x", "--rep=0", "--"}},
+			[]string{"--id=x", "--rep=0", "--"}},
 		{"Rep is not numeric",
-            []string{"--id=0", "--rep=x", "--"}},
+			[]string{"--id=0", "--rep=x", "--"}},
 		{"special arg has no value",
 			[]string{"--id", "--rep=0", "--"}},
 		{"arg has no value",
@@ -104,5 +104,42 @@ func TestPrivateSplitArg(t *testing.T) {
 		if value != c.value {
 			t.Errorf("Value: expected %q but got %q", c.value, value)
 		}
+	}
+}
+
+func TestNoFurtherArguments(t *testing.T) {
+	args, err := ParseCommandline(
+		[]string{"--id=4", "--rep=7", "--", "x=a", "y=2"},
+		nil)
+
+	if err != nil {
+		t.Errorf("command line was not parsed successfully")
+		return
+	}
+
+	err = args.NoFurtherArguments()
+
+	if err == nil {
+		t.Errorf("expected error before args were consumed")
+	}
+
+	if err.Error() != "multijob: Unused arguments remain: \"x\", \"y\"" {
+		t.Errorf("wrong error message: %q", err.Error())
+	}
+
+	_, err = args.GetStr("x")
+	if err != nil {
+		t.Errorf("GetStr(x) failed: %s", err.Error())
+	}
+
+	_, err = args.GetStr("y")
+	if err != nil {
+		t.Errorf("GetStr(y) failed: %s", err.Error())
+	}
+
+	err = args.NoFurtherArguments()
+
+	if err != nil {
+		t.Errorf("unexpected error after args were consumed: %q", err.Error())
 	}
 }
