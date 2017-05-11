@@ -31,8 +31,18 @@ auto Args::no_further_arguments() const -> void
 
 auto Args::get_s(std::string const& name) -> std::string
 {
-    auto result = m_args.at(name);
-    m_args.erase(name);
+    auto result_it = m_args.find(name);
+
+    if (result_it == m_args.end())
+    {
+        throw MULTIJOB_ERROR(
+                "param does not exist: " << std::quoted(name));
+    }
+
+    auto result = result_it->second;
+
+    m_args.erase(result_it);
+
     return result;
 }
 

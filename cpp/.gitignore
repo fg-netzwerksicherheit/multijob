@@ -2,6 +2,7 @@
 
 # coverage data
 *.gcno
+/coverage/
 
 # editor files
 .ycm_extra_conf.py

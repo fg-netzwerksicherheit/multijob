@@ -1,6 +1,7 @@
 #include "include/multijob.h"
 #include "MultijobError.h"
 #include "JoinedAndQuoted.h"
+#include "conversion.h"
 
 #include <string>
 #include <iomanip>
@@ -92,7 +93,7 @@ auto parse_commandline(
                 "special repetition_id argument " <<
                 std::quoted(config.repetition_id_key) << " required");
     }
-    auto repetition_id_str = repetition_id_it->first;
+    auto repetition_id_str = repetition_id_it->second;
     special_args.erase(repetition_id_it);
 
     if (special_args.size())
@@ -108,21 +109,8 @@ auto parse_commandline(
                 joined_and_quoted(", ", keys.begin(), keys.end()));
     }
 
-    std::size_t consumed_chars = 0;
-    ID job_id = ID(std::stoul(job_id_str, &consumed_chars));
-    if (consumed_chars != job_id_str.size())
-    {
-        throw MULTIJOB_ERROR(
-                "can't parse job_id: " << std::quoted(job_id_str));
-    }
-
-    consumed_chars = 0;
-    ID repetition_id = ID(std::stoul(repetition_id_str, &consumed_chars));
-    if (consumed_chars != repetition_id_str.size())
-    {
-        throw MULTIJOB_ERROR(
-                "can't parse repetition_id: " << std::quoted(repetition_id_str));
-    }
+    ID job_id = ID(convert_str_to_ul("job_id", job_id_str));
+    ID repetition_id = ID(convert_str_to_ul("repetition_id", repetition_id_str));
 
     return {job_id, repetition_id, normal_args};
 }

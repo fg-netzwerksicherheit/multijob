@@ -44,3 +44,19 @@ To use this library, you need to add compiler flags:
  -  add `.../lib` to your library search path, and link to Multijob:
 
         -L .../lib -lmultijob
+
+## Executing tests
+
+    $ make clean tests DEBUG=1
+
+The tests will also generate a test coverage report.
+For that, you need a suitably modern GCOVR tool,
+and a GCOV tool that matches your compiler.
+For example, when compiling with clang 3.8:
+
+    $ make clean tests DEBUG=1      \
+        CXX=clang++-3.8             \
+        GCOV='llvm-cov-3.8 gcov'    \
+        GCOVR=/path/to/gcovr
+
+TODO: write a configure script that can store these paths.
