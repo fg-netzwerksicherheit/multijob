@@ -13,7 +13,7 @@ SOURCES = multijob.cpp 	\
 
 OBJECTS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.o)
 
-.PHONY: build
+.PHONY: build clean
 
 build: $(BUILD_DIR)/libmultijob.a $(OBJECTS)
 
@@ -23,3 +23,6 @@ $(BUILD_DIR)/%.o : %.cpp
 
 $(BUILD_DIR)/libmultijob.a: $(OBJECTS)
 	$(AR) rcs $@ $^
+
+clean:
+	rm -rf $(BUILD_DIR)
