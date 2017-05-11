@@ -15,8 +15,11 @@ OBJECTS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.o)
 
 .PHONY: build
 
-build: $(OBJECTS)
+build: $(BUILD_DIR)/libmultijob.a $(OBJECTS)
 
 $(BUILD_DIR)/%.o : %.cpp
 	[ -d $(BUILD_DIR) ] || mkdir $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/libmultijob.a: $(OBJECTS)
+	$(AR) rcs $@ $^
