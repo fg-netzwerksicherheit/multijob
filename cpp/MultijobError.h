@@ -4,11 +4,11 @@
 #include <sstream>
 
 #define MULTIJOB_ERROR(msg_stream_operations) \
-    do { \
+    [&](){ \
         std::ostringstream _multijob_err_msg; \
         _multijob_err_msg << "multijob: " << msg_stream_operations; \
-        throw multijob::MultijobError{multijob::MultijobError::tag_no_prefix{}, _multijob_err_msg.str()}; \
-    } while (false)
+        return multijob::MultijobError{multijob::MultijobError::tag_no_prefix{}, _multijob_err_msg.str()}; \
+    }()
 
 namespace multijob
 {

@@ -1,5 +1,6 @@
 #include "include/multijob/Args.h"
-#include "include/multijob/MultijobError.h"
+#include "MultijobError.h"
+#include "JoinedAndQuoted.h"
 
 #include <vector>
 #include <algorithm>
@@ -23,19 +24,9 @@ auto Args::no_further_arguments() const -> void
 
     std::sort(keys.begin(), keys.end());
 
-    std::ostringstream err_msg;
-    err_msg << "params were not consumed: ";
-
-    bool want_comma = false;
-    for (auto const& k : keys)
-    {
-        if (want_comma)
-            err_msg << ", ";
-        err_msg << std::quoted(k);
-        want_comma = true;
-    }
-
-    throw MultijobError(err_msg.str());
+    throw MULTIJOB_ERROR(
+            "params were not consumed: " <<
+            joined_and_quoted(", ", keys.begin(), keys.end()));
 }
 
 auto Args::get_s(std::string const& name) -> std::string
@@ -52,7 +43,7 @@ auto Args::get_i(std::string const& name) -> int
     int result = std::stoi(s, &consumed_chars);
 
     if (consumed_chars != s.size()) {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "param " << std::quoted(name) <<
                 " is not integer: " << std::quoted(s));
     }
@@ -68,7 +59,7 @@ auto Args::get_d(std::string const& name) -> double
 
     if (consumed_chars != s.size())
     {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "param " << std::quoted(name) <<
                 " is not double: " << std::quoted(s));
     }
@@ -86,7 +77,7 @@ auto Args::get_b(std::string const& name) -> bool
     if (s == "False" || s == "false")
         return false;
 
-    MULTIJOB_ERROR(
+    throw MULTIJOB_ERROR(
             "param " << std::quoted(name) <<
             " is not boolean: " << std::quoted(s));
 }

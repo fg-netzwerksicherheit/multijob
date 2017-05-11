@@ -1,5 +1,6 @@
 #include "include/multijob.h"
-#include "include/multijob/MultijobError.h"
+#include "MultijobError.h"
+#include "JoinedAndQuoted.h"
 
 #include <string>
 #include <iomanip>
@@ -14,7 +15,7 @@ namespace
         auto sep_pos = arg.find('=');
 
         if (sep_pos == std::string::npos)
-            MULTIJOB_ERROR("can't split as argument: " << std::quoted(arg));
+            throw MULTIJOB_ERROR("can't split as argument: " << std::quoted(arg));
 
         auto key    = arg.substr(0, sep_pos);
         auto value  = arg.substr(sep_pos + 1);
@@ -59,46 +60,7 @@ namespace
         return {std::move(special_args), std::move(normal_args)};
     }
 
-    template<class It>
-    class JoinedAndQuoted final
-    {
-        std::string const m_sep;
-        It m_begin;
-        It const m_end;
-
-    public:
-        JoinedAndQuoted(std::string sep, It begin, It end)
-            : m_sep{sep}
-            , m_begin{begin}
-            , m_end{end}
-        {}
-
-        friend auto operator<<(std::ostream& out, JoinedAndQuoted const& self)
-            -> std::ostream&
-        {
-            auto it = self.m_begin;
-
-            bool want_comma = false;
-            for (; it != self.m_end; ++it)
-            {
-                if (want_comma)
-                    out << ", ";
-                want_comma = true;
-
-                out << std::quoted(*it);
-            }
-
-            return out;
-        }
-    };
-
-    template<class It>
-    auto joined_and_quoted(std::string sep, It begin, It end)
-        -> JoinedAndQuoted<It>
-    {
-        return {sep, begin, end};
-    }
-}
+  }
 
 namespace multijob
 {
@@ -116,7 +78,7 @@ auto parse_commandline(
     auto job_id_it = special_args.find(config.job_id_key);
     if (job_id_it == special_args.end())
     {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "special job_id argument " <<
                 std::quoted(config.job_id_key) << " required");
     }
@@ -126,7 +88,7 @@ auto parse_commandline(
     auto repetition_id_it = special_args.find(config.repetition_id_key);
     if (repetition_id_it == special_args.end())
     {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "special repetition_id argument " <<
                 std::quoted(config.repetition_id_key) << " required");
     }
@@ -140,7 +102,7 @@ auto parse_commandline(
             keys.emplace_back(kv.first);
         std::sort(keys.begin(), keys.end());
 
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "unknown special arguments before " << std::quoted("--") <<
                 " separator: " <<
                 joined_and_quoted(", ", keys.begin(), keys.end()));
@@ -150,7 +112,7 @@ auto parse_commandline(
     ID job_id = ID(std::stoul(job_id_str, &consumed_chars));
     if (consumed_chars != job_id_str.size())
     {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "can't parse job_id: " << std::quoted(job_id_str));
     }
 
@@ -158,7 +120,7 @@ auto parse_commandline(
     ID repetition_id = ID(std::stoul(repetition_id_str, &consumed_chars));
     if (consumed_chars != repetition_id_str.size())
     {
-        MULTIJOB_ERROR(
+        throw MULTIJOB_ERROR(
                 "can't parse repetition_id: " << std::quoted(repetition_id_str));
     }
 

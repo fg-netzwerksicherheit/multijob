@@ -1,4 +1,4 @@
-#include "include/multijob/MultijobError.h"
+#include "MultijobError.h"
 
 namespace multijob {
 
