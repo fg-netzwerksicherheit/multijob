@@ -13,13 +13,17 @@ SOURCES = multijob.cpp 	\
 
 OBJECTS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.o)
 
+DEPS = $(SOURCES:%.cpp=$(BUILD_DIR)/%.d)
+
+-include $(DEPS)
+
 .PHONY: build clean
 
 build: $(BUILD_DIR)/libmultijob.a $(OBJECTS)
 
 $(BUILD_DIR)/%.o : %.cpp
-	[ -d $(BUILD_DIR) ] || mkdir $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+	@ [ -d $(BUILD_DIR) ] || mkdir $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -MMD -MF $(BUILD_DIR)/$*.d -c -o $@ $<
 
 $(BUILD_DIR)/libmultijob.a: $(OBJECTS)
 	$(AR) rcs $@ $^
