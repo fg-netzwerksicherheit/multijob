@@ -1,6 +1,7 @@
 #include "include/multijob/Args.h"
 #include "MultijobError.h"
 #include "JoinedAndQuoted.h"
+#include "conversion.h"
 
 #include <vector>
 #include <algorithm>
@@ -49,32 +50,15 @@ auto Args::get_s(std::string const& name) -> std::string
 auto Args::get_i(std::string const& name) -> int
 {
     auto s = get_s(name);
-    std::size_t consumed_chars = 0;
-    int result = std::stoi(s, &consumed_chars);
 
-    if (consumed_chars != s.size()) {
-        throw MULTIJOB_ERROR(
-                "param " << std::quoted(name) <<
-                " is not integer: " << std::quoted(s));
-    }
-
-    return result;
+    return convert_str_to_i(name, s);
 }
 
 auto Args::get_d(std::string const& name) -> double
 {
     auto s = get_s(name);
-    std::size_t consumed_chars = 0;
-    double result = std::stod(s, &consumed_chars);
 
-    if (consumed_chars != s.size())
-    {
-        throw MULTIJOB_ERROR(
-                "param " << std::quoted(name) <<
-                " is not double: " << std::quoted(s));
-    }
-
-    return result;
+    return convert_str_to_ld(name, s);
 }
 
 auto Args::get_b(std::string const& name) -> bool

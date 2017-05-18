@@ -17,7 +17,7 @@ CXXFLAGS += -std=c++14
 ifneq ($(DEBUG),)
 	CXXFLAGS += -g --coverage -O0
 endif
-CXXFLAGS += -Weverything -Werror -Wno-c++98-compat -Wno-error=shadow
+CXXFLAGS += -Weverything -Werror -Wno-c++98-compat -Wno-error=shadow -Wno-padded
 CPPFLAGS += -I $(INCLUDE_DIR)
 
 SOURCES = multijob.cpp 	\
