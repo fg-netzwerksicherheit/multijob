@@ -287,6 +287,11 @@ void describe_Args(Test& t)
             t.is("expected result", args.get_i("a"), 403);
         });
 
+        t.it("can be negative", [&](auto& t) {
+            multijob::Args args { 4, 5, {{"a", "-17"}} };
+            t.is("expected result", args.get_i("a"), -17);
+        });
+
         t.it("throws for non-integers", [&](auto& t) {
             multijob::Args args { 4, 5, {{"a", "4.2"}} };
             t.template throws<std::runtime_error>("", [&](auto&) {
@@ -298,6 +303,30 @@ void describe_Args(Test& t)
             multijob::Args args { 4, 5, {{"a", std::string(100, '9')}} };
             t.template throws<std::runtime_error>("", [&](auto&) {
                 args.get_i("a");
+            });
+        });
+
+    });
+
+    t.describe("get_u", [&](auto& t) {
+
+        t.it("works", [&](auto& t) {
+            multijob::Args args { 4, 6, {{"a", "403"}} };
+            std::size_t result = args.get_u("a");
+            t.is("expected result", result, unsigned{403});
+        });
+
+        t.it("throws for non-integers", [&](auto& t) {
+            multijob::Args args { 4, 5, {{"a", "0foo"}} };
+            t.template throws<std::runtime_error>("", [&](auto&) {
+                args.get_u("a");
+            });
+        });
+
+        t.it("throws when negative", [&](auto& t) {
+            multijob::Args args { 3, 8, {{"a", "-5"}} };
+            t.template throws<std::runtime_error>("", [&](auto&) {
+                args.get_u("a");
             });
         });
 

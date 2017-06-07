@@ -54,6 +54,13 @@ auto Args::get_i(std::string const& name) -> int
     return convert_str_to_i(name, s);
 }
 
+auto Args::get_u(std::string const& name) -> unsigned int
+{
+    auto s = get_s(name);
+
+    return convert_str_to_u(name, s);
+}
+
 auto Args::get_d(std::string const& name) -> double
 {
     auto s = get_s(name);

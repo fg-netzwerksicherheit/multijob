@@ -31,6 +31,8 @@ public:
 
     auto get_i(std::string const& name) -> int;
 
+    auto get_u(std::string const& name) -> unsigned int;
+
     auto get_d(std::string const& name) -> double;
 
     auto get_b(std::string const& name) -> bool;

@@ -14,10 +14,11 @@ This library allows you to implement C++ executables that understand the command
         int         b = args.get_i("b");
         double      c = args.get_d("c");
         bool        d = args.get_b("d");
+        std::size_t e = args.get_u("e");
 
         args.no_further_arguments();
 
-        your_ea(a, b, c, d);
+        your_ea(a, b, c, d, e);
 
         return 0;
     }

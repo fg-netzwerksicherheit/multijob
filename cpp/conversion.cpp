@@ -63,6 +63,23 @@ auto convert_str_to_i(std::string const& name, std::string const& s)
     });
 }
 
+auto convert_str_to_u(std::string const& name, std::string const& s)
+    -> unsigned int
+{
+    auto result = convert("an unsigned integer", name, s, [](auto&& str, auto&& pos){
+        return std::stoi(str, pos, 0);
+    });
+
+    if (result < 0)
+    {
+        throw MULTIJOB_ERROR(
+                "can't parse " << name << ": "
+                << std::quoted(s) << " is not " << "an unsigned integer");
+    }
+
+    return static_cast<unsigned int>(result);
+}
+
 auto convert_str_to_ul(std::string const& name, std::string const& s)
     -> unsigned long
 {
