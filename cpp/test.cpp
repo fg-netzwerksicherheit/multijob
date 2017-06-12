@@ -206,9 +206,9 @@ int main(int, char**) {
 void describe_parse_commandline(Test& t) {
 
     t.it("decodes IDs", [&](auto& t) {
-        int const argc = 4;
+        int const argc = 5;
         char const* const argv[] = {
-            "--id=4", "--rep=7", "--", "a=b",
+            "self", "--id=4", "--rep=7", "--", "a=b",
         };
 
         multijob::Args args = multijob::parse_commandline(argc, argv);
@@ -230,19 +230,19 @@ void describe_parse_commandline(Test& t) {
     t.it("raises errors for malformed command lines", [&](auto& t) {
         std::vector<std::pair<std::string, std::vector<char const*>>> cases = {
             {"missing --rep",
-                {"--id=0", "--"}},
+                {"self", "--id=0", "--"}},
             {"missing --id",
-                {"--rep=0", "--"}},
+                {"self", "--rep=0", "--"}},
             {"unknown special arg",
-                {"--id=0", "--rep=0", "--this doesn't exist=0", "--"}},
+                {"self", "--id=0", "--rep=0", "--this doesn't exist=0", "--"}},
             {"Id is not numeric",
-                {"--id=x", "--rep=0", "--"}},
+                {"self", "--id=x", "--rep=0", "--"}},
             {"Rep is not numeric",
-                {"--id=0", "--rep=x", "--"}},
+                {"self", "--id=0", "--rep=x", "--"}},
             {"special arg has no value",
-                {"--id", "--rep=0", "--"}},
+                {"self", "--id", "--rep=0", "--"}},
             {"arg has no value",
-                {"--id=0", "--rep=0", "--", "x"}},
+                {"self", "--id=0", "--rep=0", "--", "x"}},
         };
 
         for (auto const& c : cases)

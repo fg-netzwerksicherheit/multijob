@@ -72,6 +72,10 @@ auto parse_commandline(
         JobArgvConfig const& config)
     -> Args
 {
+    // skip argv[0], which is the executable name
+    --argc;
+    ++argv;
+
     MapStrStr special_args;
     MapStrStr normal_args;
     std::tie(special_args, normal_args) = separate_argv(argc, argv, "--");
